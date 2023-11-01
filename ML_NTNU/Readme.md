@@ -27,10 +27,9 @@ Baseline and targets production values have hourly resolution.
 Weather has 15 min resolution.
 Weather parameter descriptions can be found [here](https://www.meteomatics.com/en/api/available-parameters/alphabetic-list/).
 
-There is a distinction between train and test weather data.
-For training we have both observed weather data and its forecasts, while for test we only have forecasts.
-While file `train_weather.parquet` contains one time column `date_forecast` to indicate when the values for the current row apply,
-`test_weather.parquet` also contains `date_calc` to indicate when the forecast was produced.
+There is a distinction between train and test features.
+For training, we have both observed weather data and its forecasts, while for testing we only have forecasts.
+While file `X_train_observed.parquet` contains one time-related column `date_forecast` to indicate when the values for the current row apply,
+both `X_train_estimated.parquet` and  `X_test_estimated.parquet` additionally contain `date_calc` to indicate when the forecast was produced.
 This type of test data makes evaluation closer to how the forecasting methods that are used in production.
-
 Evaluation measure is [MAE](https://en.wikipedia.org/wiki/Mean_absolute_error).
