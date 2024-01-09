@@ -1,3 +1,4 @@
+"""
 # pip install tensorflow
 
 import tensorflow as tf
@@ -9,3 +10,18 @@ train_images = train_images / 255.0
 test_images = test_images / 255.0
 
 print(train_images.shape)
+"""
+
+# import os
+# os.chdir('path/to/directory')
+
+import sys; print(sys.executable)
+
+
+import pandas as pd
+
+filename = 'red-wine.csv'
+
+df = pd.read_csv(filename)
+
+print(df.head())
