@@ -1,32 +1,20 @@
+import jax.numpy as jnp
+
 class Controller:
-    def __init__(self, kp, ki, kd):
+    def __init__(self, kp, kd, ki):
         """
-        Initializes the Controller object.
-
-        Parameters:
-        kp (float): Proportional gain.
-        ki (float): Integral gain.
-        kd (float): Derivative gain.
+        kp # Proportional gain.
+        kd # Derivative gain.
+        ki # Integral gain.
         """
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
-        self.previous_error = 0
-        self.integral = 0
+        self.parameters = jnp.array([kp, kd, ki])
 
-    def update(self, error, timestamp):
-        """
-        Updates the controller's output based on the error.
+    def update(self, parameters, error, prev_error, integral):
 
-        Parameters:
-        error (float): The error signal (goal_state - current_state).
-        dt (float): Time interval.
+        kp, kd, ki = parameters
+        derivative = error - prev_error
 
-        Returns:
-        float: The control input.
-        """
-        self.integral += error * (timestamp+1)
-        derivative = (error - self.previous_error) / (timestamp+1)
-        output = self.kp * error + self.ki * self.integral + self.kd * derivative
-        self.previous_error = error
-        return output
+        # U = kp*E + kd*(dE/dt) + ki*integral( E)
+        output_signal = kp*error + kd*derivative + ki*integral
+        
+        return output_signal

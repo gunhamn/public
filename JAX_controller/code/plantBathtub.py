@@ -1,7 +1,5 @@
 
-import numpy as np
 import jax.numpy as jnp
-from jax import grad, jit
 from plant import Plant
 
 
@@ -30,9 +28,7 @@ class plantBathtub(Plant):
         Q = V * C  # Flow rate of exiting water
         delta_B = (input + disturbance - Q)  # Change in bathtub volume
         delta_H = delta_B / A  # Change in water height
-        new_state = state + delta_H # New water height
+        new_state = jnp.maximum(state + delta_H, 0) # New water height, cannot be negative
+        error = self.goal_state - new_state
 
-        return jnp.maximum(new_state, 0)  # Water height cannot be negative
-    
-    def updateDerivative(self, state, input, disturbance, parameters):
-        return grad(self.update, argnums=0)(state, input, disturbance, parameters)
+        return error, new_state

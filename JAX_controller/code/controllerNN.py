@@ -56,7 +56,7 @@ class ControllerNN:
         # output layer, no activation function
         (w, b) = parameters[-1]
         x = jnp.dot(x, w) + b
-        return x
+        return sigmoid(x)
 
     def update(self, parameters, error, prev_error, integral):
         derivative = error - prev_error
