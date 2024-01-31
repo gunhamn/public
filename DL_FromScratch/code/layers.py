@@ -23,12 +23,16 @@ class Dense:
         
         # Apply the chain rule to get the gradient of the loss with respect to the z (pre-activation)
         grad_z = grad_output * grad_activation
+        # np.einsum('ij,ij->ij', grad_output, grad_activation)
         
         # Compute gradients with respect to weights and biases
         grad_W = np.dot(input.T, grad_z)
+        # np.einsum('ji,jk->ik', input, grad_z)
         grad_b = np.sum(grad_z, axis=0)
+        #np.einsum('ij->j', grad_z)
         
         # Compute gradient with respect to the input of the current layer
         grad_input = np.dot(grad_z, self.W.T)
+        #np.einsum('ij,jk->ik', grad_z, self.W.T)
         
         return grad_input, grad_W, grad_b
