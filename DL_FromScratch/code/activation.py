@@ -1,15 +1,15 @@
 import numpy as np
 
 def get_activation(activation_name: str):
-        activations = {
-            'relu': Relu,
-            'sigmoid': Sigmoid,
-            'tanh': Tanh,
-            'softmax': Softmax,
-            'linear': Linear
-        }
-        # Returns the activation class; defaults to Linear if not found
-        return activations.get(activation_name.lower(), Linear)
+    activations = {
+        'relu': Relu,
+        'sigmoid': Sigmoid,
+        'tanh': Tanh,
+        'softmax': Softmax,
+        'linear': Linear
+    }
+    # Returns the activation class; defaults to Linear if not found
+    return activations.get(activation_name.lower(), Linear)
 
 class Relu:
     @staticmethod
