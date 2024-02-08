@@ -188,15 +188,15 @@ if __name__ == "__main__":
     consys.run_system()
     consys.plot_Jax_results()
 
-    
+    """
     hidden_layers = [4]
     activation_functions = [relu]
     controller = ControllerNN(hidden_layers, activation_functions, range_init=[-0.1, 0.1])
-    plant = plantCournot(q1 = 0.5, q2 = 0.5, pMax = 4, goal_state = 2, marginalCost = 0.2)
-    consys = Consys(150, 10, controller, plant, learning_rate=0.2, D_range=[-0.01, 0.01])
+    plant = plantCournot(q1 = 0, q2 = 0, pMax = 4, goal_state = 2, marginalCost = 0.2)
+    consys = Consys(150, 10, controller, plant, learning_rate=0.05, D_range=[-0.01, 0.01])
     consys.run_system()
     consys.plot_NN_results()
-
+    """
     
     controller = ControllerJax(kp=0.1, kd=0.10, ki=0.05)
     plant = plantLotkaVolterra(rabbits = 1, foxes = 1, goal_state = 2,
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     consys = Consys(30, 10, controller, plant, learning_rate=0.01, D_range=[-0.02, 0.02])
     consys.run_system()
     consys.plot_NN_results()
-    """
+    
 
     controller = ControllerJax(kp=0.1, kd=0.10, ki=0.05)
     plant = plantBathtub(cross_sectional_area=1, drain_area=0.01, initial_height=1)
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     consys.run_system()
     consys.plot_Jax_results()
 
-    """
+    
     hidden_layers = [4]
     activation_functions = [relu]
     controller = ControllerNN(hidden_layers, activation_functions, range_init=[-0.1, 0.1])
