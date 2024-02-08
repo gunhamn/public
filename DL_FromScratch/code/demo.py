@@ -1,12 +1,12 @@
 """
-Softmax
-Regulariation L1 and L2
+Todo:
+
 
 c - Number of layers: 0-5 hidden
 c - Number of neurons: 1-1000
 c - Activation functions: ReLU, Sigmoid, Tanh, Softmax, Linear
 c - Loss functions: MSE, Cross-entropy
-- Regularization: L1, L2, none. Rate=0.001
+c - Regularization: L1, L2, none. Rate=0.001
 c - Initial w and b for each layer
 c - Verbose: network input and output, target values and loss
 - Plot loss per minibatch (Train: 70%, Validate: 20%, Test: 10%)

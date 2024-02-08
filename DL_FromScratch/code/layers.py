@@ -30,7 +30,7 @@ class Dense:
         grad_activation = self.activation.grad(self.last_z)
         
         # Apply the chain rule to get the gradient of the loss with respect to the z (pre-activation)
-        grad_z = grad_output * grad_activation
+        grad_z = np.multiply(grad_output, grad_activation)
         
         # Compute gradients with respect to weights and biases
         self.grad_W = np.dot(self.last_input.T, grad_z)
@@ -38,9 +38,8 @@ class Dense:
         
         # Compute gradient with respect to the input of the current layer
         grad_input = np.dot(grad_z, self.W.T)
-        
         return grad_input
     
-    def update(self, learning_rate):
-        self.W -= learning_rate * self.grad_W
-        self.b -= learning_rate * self.grad_b
+    def update(self, learning_rate, regularization, regLambda):
+        self.W -= learning_rate * (self.grad_W + regularization.grad(regLambda, self.W))
+        self.b -= learning_rate * (self.grad_b + regularization.grad(regLambda, self.b))

@@ -3,6 +3,7 @@ import numpy as np
 def get_lossFunction(lossFunction_name: str):
     lossFunctions = {
         'mse': MSE,
+        'crossentropy': CrossEntropy
     }
     # Returns the loss function method; defaults to MSE if not found
     return lossFunctions.get(lossFunction_name.lower(), MSE)
