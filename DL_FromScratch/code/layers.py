@@ -3,7 +3,7 @@ from activation import get_activation
 
 
 class Dense:
-    def __init__(self, output_size: int, activation: str, input_size: int, w_range=[-0.1, 0.1], b_range=[-0.1, 0.1]):
+    def __init__(self, output_size: int, activation: str, input_size: int, w_range=[-0.05, 0.05], b_range=[-0.05, 0.05]):
         self.input_size = input_size
         self.output_size = output_size
         self.activation = get_activation(activation)
@@ -42,4 +42,4 @@ class Dense:
     
     def update(self, learning_rate, regularization, regLambda):
         self.W -= learning_rate * (self.grad_W + regularization.grad(regLambda, self.W))
-        self.b -= learning_rate * (self.grad_b + regularization.grad(regLambda, self.b))
+        self.b -= learning_rate * (self.grad_b)

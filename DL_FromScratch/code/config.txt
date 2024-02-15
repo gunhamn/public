@@ -1,0 +1,18 @@
+[GLOBALS]
+loss = cross_entropy
+lrate = 0.05
+wreg = 0.02
+wrt = L2
+rows = 50
+cols = 50
+
+[LAYERS]
+layer_1 = {"size": 64, "activation": "relu"}
+layer_2 = {"size": 9, "activation": "softmax"}
+
+[TRAINING]
+epochs = 800
+batchSize = 100
+
+[DATASET]
+split = 0.7, 0.2, 0.1

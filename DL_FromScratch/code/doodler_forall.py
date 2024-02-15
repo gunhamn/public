@@ -642,6 +642,7 @@ def quickplot_matrix(X, colormap=CMAP.jet, fs=False, ax=None, trans=False,
             return 'x=%1.4f, y=%1.4f' % (x, y)
     axes.format_coord = format_coord
     PLT.draw()
+    input("Press Enter to close window...")
 
 # Points is a list of 2-d locations
 def quickplot_path(points,color='blue'):
