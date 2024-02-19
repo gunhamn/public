@@ -96,11 +96,14 @@ def getConfigurationModels(rows, cols, outputSize):
         regLambda=0.002)
     
     model2 = Sequential([
-        layers.Dense(output_size=outputSize, activation='relu', input_size=rows*cols)],
-        learning_rate=0.05,
+        layers.Dense(output_size=32, activation='relu', input_size=rows*cols),
+        layers.Dense(output_size=32, activation='linear', input_size=32),
+        layers.Dense(output_size=3, activation='tanh', input_size=32, w_range=[-0.2, 0.2], b_range=[-0.2, 0.2]),
+        layers.Dense(output_size=outputSize, activation='softmax', input_size=3)],
+        learning_rate=0.1,
         lossFunction='cross_entropy',
-        regularization='l2',
-        regLambda=0.02)
+        regularization='l1',
+        regLambda=0.0005)
     
     model3 = Sequential([
         layers.Dense(output_size=64, activation='relu', input_size=rows*cols, w_range=[-0.1, 0.1], b_range=[-0.1, 0.1]),
@@ -126,9 +129,9 @@ if __name__ == '__main__':
     #model1.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=300, batchSize=100)
     #print(f'Test set accuracy: {model1.accuracy(x_test, y_test)}')
     
-    #model2.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=300, batchSize=100)
-    #print(f'Test set accuracy: {model2.accuracy(x_test, y_test)}')
+    model2.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=300, batchSize=100, verbose=False)
+    print(f'Test set accuracy: {model2.accuracy(x_test, y_test)}')
     
-    model3.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=800, batchSize=100)
-    print(f'Test set accuracy: {model3.accuracy(x_test, y_test)}')
+    #model3.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=800, batchSize=100)
+    #print(f'Test set accuracy: {model3.accuracy(x_test, y_test)}')
     
