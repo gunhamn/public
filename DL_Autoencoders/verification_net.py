@@ -1,14 +1,14 @@
 import numpy as np
 from tensorflow import keras
-from tensorflow.keras.layers import Conv2D, Dense, Dropout, Flatten, MaxPooling2D
-from tensorflow.keras.models import Sequential
+from keras.layers import Conv2D, Dense, Dropout, Flatten, MaxPooling2D
+from keras.models import Sequential
 
-from stacked_mnist import DataMode, StackedMNISTData
+from stacked_mnist_tf import DataMode, StackedMNISTData
 
 
 class VerificationNet:
     def __init__(
-        self, force_learn: bool = False, file_name: str = "./models/verification_model"
+        self, force_learn: bool = False, file_name: str = "C:/Projects/public/DL_Autoencoders/models/verification_model.weights.h5"
     ) -> None:
         """
         Define model and set some parameters.
@@ -34,7 +34,7 @@ class VerificationNet:
 
         model.compile(
             loss=keras.losses.categorical_crossentropy,
-            optimizer=keras.optimizers.Adam(lr=0.01),
+            optimizer=keras.optimizers.Adam(learning_rate=0.01),
             metrics=["accuracy"],
         )
 
@@ -56,7 +56,7 @@ class VerificationNet:
 
         return done_training
 
-    def train(self, generator: StackedMNISTData, epochs: np.int = 10) -> bool:
+    def train(self, generator: StackedMNISTData, epochs: int = 10) -> bool:
         """
         Train model if required. As we have a one-channel model we take care to
         only use the first channel of the data.
@@ -70,9 +70,9 @@ class VerificationNet:
 
             # "Translate": Only look at "red" channel; only use the last digit. Use one-hot for labels during training
             x_train = x_train[:, :, :, [0]]
-            y_train = keras.utils.to_categorical((y_train % 10).astype(np.int), 10)
+            y_train = keras.utils.to_categorical((y_train % 10).astype(int), 10)
             x_test = x_test[:, :, :, [0]]
-            y_test = keras.utils.to_categorical((y_test % 10).astype(np.int), 10)
+            y_test = keras.utils.to_categorical((y_test % 10).astype(int), 10)
 
             # Fit model
             self.model.fit(
@@ -119,8 +119,8 @@ class VerificationNet:
         return predictions, beliefs
 
     def check_class_coverage(
-        self, data: np.ndarray, tolerance: np.float = 0.8
-    ) -> np.float:
+        self, data: np.ndarray, tolerance: float = 0.8
+    ) -> float:
         """
         Out of the total number of classes that can be generated, how many are in the data-set?
         I'll only count samples for which the network asserts there is at least tolerance probability
@@ -137,7 +137,7 @@ class VerificationNet:
         return coverage
 
     def check_predictability(
-        self, data: np.ndarray, correct_labels: list = None, tolerance: np.float = 0.8
+        self, data: np.ndarray, correct_labels: list = None, tolerance: float = 0.8
     ) -> tuple:
         """
         Out of the number of data points retrieved, how many are we able to make predictions about?
@@ -167,7 +167,7 @@ class VerificationNet:
 if __name__ == "__main__":
     gen = StackedMNISTData(mode=DataMode.MONO_BINARY_COMPLETE, default_batch_size=2048)
     net = VerificationNet(force_learn=False)
-    net.train(generator=gen, epochs=5)
+    net.train(generator=gen, epochs=5)  # was originally 5
 
     # I have no data generator (VAE or whatever) here, so just use a sampled set
     img, labels = gen.get_random_batch(training=True, batch_size=25000)

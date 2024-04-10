@@ -3,7 +3,7 @@ from enum import Enum, auto
 
 import matplotlib.pyplot as plt
 import numpy as np
-from tensorflow.keras.datasets import mnist
+from keras.datasets import mnist
 
 
 class DataMode(Enum):
