@@ -167,7 +167,7 @@ class VerificationNet:
 if __name__ == "__main__":
     gen = StackedMNISTData(mode=DataMode.MONO_BINARY_COMPLETE, default_batch_size=2048)
     net = VerificationNet(force_learn=False)
-    net.train(generator=gen, epochs=5)  # was originally 5
+    net.train(generator=gen, epochs=15)  # was originally 5
 
     # I have no data generator (VAE or whatever) here, so just use a sampled set
     img, labels = gen.get_random_batch(training=True, batch_size=25000)
