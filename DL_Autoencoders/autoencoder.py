@@ -18,12 +18,23 @@ class Autoencoder(Model):
         super(Autoencoder, self).__init__()
         self.encoder = tf.keras.Sequential([
             layers.Input(shape=(28, 28, 1)),
-            layers.Conv2D(18, (3, 3), activation='relu', padding='same', strides=2),
-            layers.Conv2D(2, (3, 3), activation='relu', padding='same', strides=2)])
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
+            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1),
+            layers.Flatten(),
+            layers.Dense(28 * 28 * 1, activation='relu'),
+            layers.Dense(256, activation='relu'),
+            layers.Dense(10, activation='relu')
+        ])
 
         self.decoder = tf.keras.Sequential([
-            layers.Conv2DTranspose(2, kernel_size=3, strides=2, activation='relu', padding='same'),
-            layers.Conv2DTranspose(18, kernel_size=3, strides=2, activation='relu', padding='same'),
+            layers.Dense(10, activation='relu'),
+            layers.Dense(256, activation='relu'),
+            layers.Dense(28 * 28 * 16, activation='relu'),
+            layers.Reshape((28, 28, 16)),
+            layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='relu', padding='same'),
+            layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'),
+            layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'),
             layers.Conv2D(1, kernel_size=(3, 3), activation='sigmoid', padding='same')])
 
         
@@ -36,7 +47,7 @@ class Autoencoder(Model):
     def generate_images(self, num_samples=8):
         # Sample from a standard normal distribution
         # z = np.random.randn(num_samples, 5).reshape(num_samples, 28, 28, 1)
-        z = np.random.randn(num_samples, 7, 7, 2).astype('float32')
+        z = np.random.randn(num_samples, 10).astype('float32')
 
         # Generate images
         generated_images = self.decoder(z)
@@ -63,7 +74,7 @@ def plot_comparisons(original_imgs, reconstructed_imgs=None):
 if __name__ == "__main__":
     gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=9)
     imgTest, clsTest = gen.get_random_batch(batch_size=8)
-    gen.plot_example(images=imgTest, labels=clsTest)
+    # gen.plot_example(images=imgTest, labels=clsTest)
 
     for img, cls in gen.batch_generator(training=False, batch_size=2048):
         print(f"Batch has size: Images: {img.shape}; Labels {cls.shape}")
@@ -72,18 +83,19 @@ if __name__ == "__main__":
     autoencoder = Autoencoder()
     autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
 
-    autoencoder.fit(img, img, epochs=250, batch_size=256, shuffle=True)
+    while True:
+        autoencoder.fit(img, img, epochs=50, batch_size=256, shuffle=True)
 
-    reconstructed_imgs = autoencoder.predict(imgTest)
-    plot_comparisons(imgTest, reconstructed_imgs)
+        reconstructed_imgs = autoencoder.predict(imgTest)
+        plot_comparisons(imgTest, reconstructed_imgs)
 
-    # Generate 8 random noise images
-    random_noise = np.random.rand(8, 28*28).reshape(8, 28, 28, 1)
+        # Generate 8 random noise images
+        random_noise = np.random.rand(8, 28*28).reshape(8, 28, 28, 1)
 
-    print(f"reconstructed_imgs.shape {reconstructed_imgs.shape}")
-    generated_imgs = autoencoder.generate_images()
-    print(f"generated_imgs.shape {generated_imgs.shape}")
-    plot_comparisons(generated_imgs, reconstructed_imgs)
+        print(f"reconstructed_imgs.shape {reconstructed_imgs.shape}")
+        generated_imgs = autoencoder.generate_images()
+        print(f"generated_imgs.shape {generated_imgs.shape}")
+        plot_comparisons(generated_imgs, reconstructed_imgs)
 
     
 
