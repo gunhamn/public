@@ -18,13 +18,15 @@ class Autoencoder(Model):
         super(Autoencoder, self).__init__()
         self.encoder = tf.keras.Sequential([
             layers.Input(shape=(28, 28, 1)),
-            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
-            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
-            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1),
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1), #8
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1), #8
+            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1), #8
+            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1), #8
             layers.Flatten(),
-            layers.Dense(28 * 28 * 1, activation='relu'),
-            layers.Dense(256, activation='relu'),
-            layers.Dense(10, activation='relu')
+            layers.Dense(28 * 28 * 1, activation='relu'), #1024
+            layers.Dense(256, activation='relu'), #256
+            layers.Dense(10, activation='relu') #32
+            # 4-8
         ])
 
         self.decoder = tf.keras.Sequential([
