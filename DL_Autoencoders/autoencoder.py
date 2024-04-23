@@ -6,38 +6,69 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ModelCheckpoint
 from keras import layers
 from keras.models import Model
+
 
 from stacked_mnist_tf import DataMode, StackedMNISTData
 
 
 class Autoencoder(Model):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super(Autoencoder, self).__init__()
+        self.encoded_size = 4
         self.encoder = tf.keras.Sequential([
             layers.Input(shape=(28, 28, 1)),
-            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1), #8
-            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1), #8
-            layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1), #8
-            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=1), #8
+            layers.Conv2D(16, (3, 3), activation='relu', strides=1), #8 32 32
+            layers.Conv2D(12, (2, 2), activation='relu', strides=1), #8 32 16
+            layers.Conv2D(8, (2, 2), activation='relu', strides=1), #8 32
+            layers.Conv2D(8, (2, 2), activation='relu', strides=1), #8 16
             layers.Flatten(),
-            layers.Dense(28 * 28 * 1, activation='relu'), #1024
-            layers.Dense(256, activation='relu'), #256
-            layers.Dense(10, activation='relu') #32
-            # 4-8
+            layers.Dense(1024, activation='relu'), #1024 28 * 28
+            layers.Dense(256, activation='relu'), #256 256
+            layers.Dense(32, activation='relu'), #32 10
+            layers.Dense(self.encoded_size, activation='relu') # 4-8 -
         ])
 
         self.decoder = tf.keras.Sequential([
-            layers.Dense(10, activation='relu'),
+            layers.Dense(self.encoded_size, activation='relu'),
+            layers.Dense(32, activation='relu'),
             layers.Dense(256, activation='relu'),
-            layers.Dense(28 * 28 * 16, activation='relu'),
-            layers.Reshape((28, 28, 16)),
-            layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='relu', padding='same'),
-            layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'),
-            layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu', padding='same'),
-            layers.Conv2D(1, kernel_size=(3, 3), activation='sigmoid', padding='same')])
+            layers.Dense(1024, activation='relu'),
+            layers.Dense(23*23, activation='relu'),
+            layers.Reshape((23, 23, 1)),
+            layers.Conv2DTranspose(8, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(12, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(16, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(1, kernel_size=3, strides=1, activation='sigmoid')
+        ])
+        """self.encoder = tf.keras.Sequential([
+            layers.Input(shape=(28, 28, 1)),
+            layers.Conv2D(8, (3, 3), activation='relu', strides=1), #8 32 32
+            layers.Conv2D(8, (2, 2), activation='relu', strides=1), #8 32 16
+            layers.Conv2D(8, (2, 2), activation='relu', strides=1), #8 32
+            layers.Conv2D(8, (2, 2), activation='relu', strides=1), #8 16
+            layers.Flatten(),
+            layers.Dense(1024, activation='relu'), #1024 28 * 28
+            layers.Dense(256, activation='relu'), #256 256
+            layers.Dense(32, activation='relu'), #32 10
+            layers.Dense(8, activation='relu') # 4-8 -
+        ])
+
+        self.decoder = tf.keras.Sequential([
+            layers.Dense(8, activation='relu'),
+            layers.Dense(32, activation='relu'),
+            layers.Dense(256, activation='relu'),
+            layers.Dense(1024, activation='relu'),
+            layers.Dense(23*23, activation='relu'),
+            layers.Reshape((23, 23, 1)),
+            layers.Conv2DTranspose(8, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(8, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(8, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(1, kernel_size=3, strides=1, activation='sigmoid')
+        ])"""
 
         
     def call(self, inputs):
@@ -49,12 +80,11 @@ class Autoencoder(Model):
     def generate_images(self, num_samples=8):
         # Sample from a standard normal distribution
         # z = np.random.randn(num_samples, 5).reshape(num_samples, 28, 28, 1)
-        z = np.random.randn(num_samples, 10).astype('float32')
+        z = np.random.randn(num_samples, self.encoded_size).astype('float32')
 
         # Generate images
         generated_images = self.decoder(z)
         return generated_images.numpy()
-    
 
 def plot_comparisons(original_imgs, reconstructed_imgs=None):
     n = original_imgs.shape[0]  # Assuming original_imgs is a numpy array of shape (n, 28, 28, 1)
@@ -74,30 +104,31 @@ def plot_comparisons(original_imgs, reconstructed_imgs=None):
     plt.show()
 
 if __name__ == "__main__":
-    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=9)
+    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=1024)
     imgTest, clsTest = gen.get_random_batch(batch_size=8)
     # gen.plot_example(images=imgTest, labels=clsTest)
 
-    for img, cls in gen.batch_generator(training=False, batch_size=2048):
-        print(f"Batch has size: Images: {img.shape}; Labels {cls.shape}")
+    img, cls = gen.get_full_data_set(training=True)
+
+    #for img, cls in gen.batch_generator(training=False, batch_size=2048):
+    #    print(f"Batch has size: Images: {img.shape}; Labels {cls.shape}")
     
     # Create an instance of the autoencoder
     autoencoder = Autoencoder()
     autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
 
+    # Stopping at a loss under 0.2
+    # early_stopping = EarlyStopping(monitor='loss', patience=1, verbose=1, mode='min', baseline=0.2)
+    
+    model_checkpoint = ModelCheckpoint("C:/Projects/public/DL_Autoencoders/models/autoencoder.keras",
+                                       monitor='loss', save_best_only=True, verbose=0, mode='min')
     while True:
-        autoencoder.fit(img, img, epochs=50, batch_size=256, shuffle=True)
+        autoencoder.fit(img, img, epochs=10, batch_size=512, shuffle=True, callbacks=[model_checkpoint])
 
         reconstructed_imgs = autoencoder.predict(imgTest)
         plot_comparisons(imgTest, reconstructed_imgs)
-
-        # Generate 8 random noise images
-        random_noise = np.random.rand(8, 28*28).reshape(8, 28, 28, 1)
 
         print(f"reconstructed_imgs.shape {reconstructed_imgs.shape}")
         generated_imgs = autoencoder.generate_images()
         print(f"generated_imgs.shape {generated_imgs.shape}")
         plot_comparisons(generated_imgs, reconstructed_imgs)
-
-    
-
