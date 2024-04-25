@@ -10,6 +10,7 @@ from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
 from keras import layers
 from keras.models import Model
+from convertImages import split_images, split_labels, merge_images, merge_labels
 
 
 from stacked_mnist_tf import DataMode, StackedMNISTData
@@ -73,7 +74,6 @@ class Autoencoder(Model):
         
     def call(self, inputs):
         encoded = self.encoder(inputs)
-        print(f"encoded.shape {encoded.shape}")
         decoded = self.decoder(encoded)
         return decoded
     
@@ -85,6 +85,12 @@ class Autoencoder(Model):
         # Generate images
         generated_images = self.decoder(z)
         return generated_images.numpy()
+    
+    def predictRGB(self, inputs):
+        grayScaleInputs = split_images(inputs)
+        greyScalePredictions = self.call(grayScaleInputs).numpy()
+        RGBPredictions = merge_images(greyScalePredictions)
+        return RGBPredictions
 
 def plot_comparisons(original_imgs, reconstructed_imgs=None):
     n = original_imgs.shape[0]  # Assuming original_imgs is a numpy array of shape (n, 28, 28, 1)
@@ -104,7 +110,7 @@ def plot_comparisons(original_imgs, reconstructed_imgs=None):
     plt.show()
 
 if __name__ == "__main__":
-    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=1024)
+    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=1024*100)
     imgTest, clsTest = gen.get_random_batch(batch_size=8)
     # gen.plot_example(images=imgTest, labels=clsTest)
 
@@ -120,10 +126,10 @@ if __name__ == "__main__":
     # Stopping at a loss under 0.2
     # early_stopping = EarlyStopping(monitor='loss', patience=1, verbose=1, mode='min', baseline=0.2)
     
-    model_checkpoint = ModelCheckpoint("C:/Projects/public/DL_Autoencoders/models/autoencoder.keras",
+    model_checkpoint = ModelCheckpoint("C:/Projects/public/DL_Autoencoders/models/AE_MONO_BINARY_MISSING.keras",
                                        monitor='loss', save_best_only=True, verbose=0, mode='min')
     while True:
-        autoencoder.fit(img, img, epochs=10, batch_size=512, shuffle=True, callbacks=[model_checkpoint])
+        autoencoder.fit(img, img, epochs=50, batch_size=512, shuffle=True, callbacks=[model_checkpoint], validation_split=0.1)
 
         reconstructed_imgs = autoencoder.predict(imgTest)
         plot_comparisons(imgTest, reconstructed_imgs)
