@@ -20,9 +20,9 @@ tfd = tfp.distributions
 from stacked_mnist_tf import DataMode, StackedMNISTData
 
 
-class Variational_autoencoder(Model):
-    def __init__(self):
-        super(Variational_autoencoder, self).__init__()
+class VariationalAutoencoder(Model):
+    def __init__(self, *args, **kwargs):
+        super(VariationalAutoencoder, self).__init__()
         self.inputShape = (28, 28, 1)
         self.encoded_size = 16
         self.base_depth = 32
@@ -32,7 +32,7 @@ class Variational_autoencoder(Model):
 
         self.encoder = tfk.Sequential([
             tfkl.InputLayer(input_shape=self.inputShape),
-            tfkl.Lambda(lambda x: tf.cast(x, tf.float32) - 0.5),
+            tfkl.Lambda(lambda x: tf.cast(x, tf.float32) - 0.5), # Normalizes the input data
             tfkl.Conv2D(self.base_depth, 5, strides=1,
                         padding='same', activation=tf.nn.leaky_relu),
             tfkl.Conv2D(self.base_depth, 5, strides=2,
@@ -81,8 +81,8 @@ class Variational_autoencoder(Model):
     def generate_images(self, num_samples=8):
         # Sample from a standard normal distribution
         # z = np.random.randn(num_samples, 5).reshape(num_samples, 28, 28, 1)
-        z = np.random.randn(num_samples, self.encoded_size).astype('float32')
-
+        # z = np.random.randn(num_samples, self.encoded_size).astype('float32')
+        z = self.prior.sample(num_samples)
         # Generate images
         generated_images = self.decoder(z)
         return generated_images.sample().numpy()
@@ -106,17 +106,22 @@ def plot_comparisons(original_imgs, reconstructed_imgs=None):
     plt.show()
 
 if __name__ == "__main__":
-    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=2048)
+    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_MISSING, default_batch_size=1024)
     img, cls = gen.get_full_data_set(training=True)
     imgTest, clsTest = gen.get_random_batch(batch_size=8)
     # Create an instance of the autoencoder
-    autoencoder = Variational_autoencoder()
-    autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+    autoencoder = VariationalAutoencoder()
+    negative_log_likelihood = lambda x, rv_x: -rv_x.log_prob(x)
+    autoencoder.compile(optimizer='adam', loss=negative_log_likelihood)
+        # loss = negative_log_likehood
+        # learning_rate = 0.001
 
-    model_checkpoint = ModelCheckpoint("C:/Projects/public/DL_Autoencoders/models/autoencoder.keras",
-                                       monitor='loss', save_best_only=True, verbose=0, mode='min')
+    #model_checkpoint = ModelCheckpoint("C:/Projects/public/DL_Autoencoders/models/autoencoder.keras",
+    #                                   monitor='loss', save_best_only=True, verbose=0, mode='min')
     while True:
-        autoencoder.fit(img, img, epochs=15, batch_size=256*4, shuffle=True, callbacks=[model_checkpoint])
+        #autoencoder.fit(img, img, epochs=50, batch_size=256*4, shuffle=True, callbacks=[model_checkpoint])
+        autoencoder.fit(img, img, epochs=10, batch_size=256, shuffle=True)
+        # validation_data = ____
 
         reconstructed_imgs = autoencoder.predict(imgTest)
         plot_comparisons(imgTest, reconstructed_imgs)
@@ -128,5 +133,6 @@ if __name__ == "__main__":
         generated_imgs = autoencoder.generate_images()
         print(f"generated_imgs.shape {generated_imgs.shape}")
         plot_comparisons(generated_imgs, reconstructed_imgs)
+        autoencoder.save("C:/Projects/public/DL_Autoencoders/models/variational_autoencoder.keras")
     
 
