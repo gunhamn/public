@@ -11,17 +11,17 @@ from keras.callbacks import ModelCheckpoint
 from keras import layers
 from keras.models import Model
 from convertImages import split_images, split_labels, merge_images, merge_labels
-
-
 from stacked_mnist_tf import DataMode, StackedMNISTData
 
 
 class Autoencoder(Model):
     def __init__(self, *args, **kwargs):
         super(Autoencoder, self).__init__()
-        self.encoded_size = 4
+        self.encoded_size = 16
         self.encoder = tf.keras.Sequential([
             layers.Input(shape=(28, 28, 1)),
+            layers.Conv2D(64, (3, 3), activation='relu', strides=1), #8 32 32
+            layers.Conv2D(32, (3, 3), activation='relu', strides=1), #8 32 32
             layers.Conv2D(16, (3, 3), activation='relu', strides=1), #8 32 32
             layers.Conv2D(12, (2, 2), activation='relu', strides=1), #8 32 16
             layers.Conv2D(8, (2, 2), activation='relu', strides=1), #8 32
@@ -30,7 +30,7 @@ class Autoencoder(Model):
             layers.Dense(1024, activation='relu'), #1024 28 * 28
             layers.Dense(256, activation='relu'), #256 256
             layers.Dense(32, activation='relu'), #32 10
-            layers.Dense(self.encoded_size, activation='relu') # 4-8 -
+            layers.Dense(self.encoded_size, activation='sigmoid') # 4-8 -
         ])
 
         self.decoder = tf.keras.Sequential([
@@ -38,11 +38,13 @@ class Autoencoder(Model):
             layers.Dense(32, activation='relu'),
             layers.Dense(256, activation='relu'),
             layers.Dense(1024, activation='relu'),
-            layers.Dense(23*23, activation='relu'),
-            layers.Reshape((23, 23, 1)),
+            layers.Dense(18*18, activation='relu'),
+            layers.Reshape((18, 18, 1)),
             layers.Conv2DTranspose(8, kernel_size=2, strides=1, activation='relu'),
             layers.Conv2DTranspose(12, kernel_size=2, strides=1, activation='relu'),
-            layers.Conv2DTranspose(16, kernel_size=2, strides=1, activation='relu'),
+            layers.Conv2DTranspose(16, kernel_size=3, strides=1, activation='relu'),
+            layers.Conv2DTranspose(32, kernel_size=3, strides=1, activation='relu'),
+            layers.Conv2DTranspose(64, kernel_size=3, strides=1, activation='relu'),
             layers.Conv2DTranspose(1, kernel_size=3, strides=1, activation='sigmoid')
         ])
         """self.encoder = tf.keras.Sequential([
@@ -91,6 +93,11 @@ class Autoencoder(Model):
         greyScalePredictions = self.call(grayScaleInputs).numpy()
         RGBPredictions = merge_images(greyScalePredictions)
         return RGBPredictions
+    
+    def generateRGB(self, num_samples=8):
+        grayScalePredictions = self.generate_images(num_samples*3)
+        RGBPredictions = merge_images(grayScalePredictions)
+        return RGBPredictions
 
 def plot_comparisons(original_imgs, reconstructed_imgs=None):
     n = original_imgs.shape[0]  # Assuming original_imgs is a numpy array of shape (n, 28, 28, 1)
@@ -129,7 +136,7 @@ if __name__ == "__main__":
     model_checkpoint = ModelCheckpoint("C:/Projects/public/DL_Autoencoders/models/AE_MONO_BINARY_MISSING.keras",
                                        monitor='loss', save_best_only=True, verbose=0, mode='min')
     while True:
-        autoencoder.fit(img, img, epochs=50, batch_size=512, shuffle=True, callbacks=[model_checkpoint], validation_split=0.1)
+        autoencoder.fit(img, img, epochs=20, batch_size=512, shuffle=True, callbacks=[model_checkpoint], validation_split=0.1)
 
         reconstructed_imgs = autoencoder.predict(imgTest)
         plot_comparisons(imgTest, reconstructed_imgs)

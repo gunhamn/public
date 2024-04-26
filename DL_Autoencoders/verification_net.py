@@ -165,9 +165,9 @@ class VerificationNet:
 
 
 if __name__ == "__main__":
-    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_COMPLETE, default_batch_size=25000*4)
+    gen = StackedMNISTData(mode=DataMode.COLOR_BINARY_MISSING, default_batch_size=25000*4)
     net = VerificationNet(force_learn=False,
-        file_name = "C:/Projects/public/DL_Autoencoders/models/net_MONO_BINARY_COMPLETE.weights.h5")
+        file_name = "C:/Projects/public/DL_Autoencoders/models/net_COLOR_BINARY_MISSING.weights.h5")
     net.train(generator=gen, epochs=10)  # was originally 5
 
     # I have no data generator (VAE or whatever) here, so just use a sampled set

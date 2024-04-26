@@ -10,15 +10,11 @@ import tf_keras as tfk
 from tf_keras import Model
 import tensorflow_probability as tfp
 from keras.callbacks import ModelCheckpoint
-
 tfkl = tfk.layers
 tfpl = tfp.layers
 tfd = tfp.distributions
-
-
-
+from convertImages import split_images, split_labels, merge_images, merge_labels
 from stacked_mnist_tf import DataMode, StackedMNISTData
-
 
 class VariationalAutoencoder(Model):
     def __init__(self, *args, **kwargs):
@@ -40,7 +36,7 @@ class VariationalAutoencoder(Model):
                         padding='same', activation=tf.nn.leaky_relu),
             tfkl.Conv2D(2 * 32, 5, strides=2,
                         padding='same', activation=tf.nn.leaky_relu),
-            tfkl.Conv2D(4 * self.encoded_size, 7, strides=1,
+            tfkl.Conv2D(4 * 16, 7, strides=1,
                         padding='valid', activation=tf.nn.leaky_relu),
             tfkl.Flatten(),
             tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(self.encoded_size),
@@ -53,7 +49,7 @@ class VariationalAutoencoder(Model):
         self.decoder = tfk.Sequential([
             tfkl.InputLayer(input_shape=[self.encoded_size]),
             tfkl.Reshape([1, 1, self.encoded_size]),
-            tfkl.Conv2DTranspose(2 * 32, 7, strides=1,
+            tfkl.Conv2DTranspose(4 * 16, 7, strides=1,
                                 padding='valid', activation=tf.nn.leaky_relu),
             tfkl.Conv2DTranspose(2 * 32, 5, strides=1,
                                 padding='same', activation=tf.nn.leaky_relu),
@@ -76,6 +72,9 @@ class VariationalAutoencoder(Model):
         decoded = self.decoder(encoded)
         return decoded
     
+    def predict(self, inputs):
+        return self.call(inputs).mean().numpy()
+    
     def generate_images(self, num_samples=8):
         # Sample from a standard normal distribution
         # z = np.random.randn(num_samples, 5).reshape(num_samples, 28, 28, 1)
@@ -83,8 +82,20 @@ class VariationalAutoencoder(Model):
         z = self.prior.sample(num_samples)
         # Generate images
         generated_images = self.decoder(z)
-        return generated_images.sample().numpy()
+        return generated_images.mean().numpy()
+        
+    def predictRGB(self, inputs):
+        grayScaleInputs = split_images(inputs)
+        greyScalePredictions = self.call(grayScaleInputs)
+        greyScalePredictions = np.array(greyScalePredictions.mean())
+        RGBPredictions = merge_images(greyScalePredictions)
+        return RGBPredictions
     
+    def generateRGB(self, num_samples=8):
+        grayScalePredictions = self.generate_images(num_samples*3)
+        RGBPredictions = merge_images(grayScalePredictions)
+        return RGBPredictions
+
 
 def plot_comparisons(original_imgs, reconstructed_imgs=None):
     n = original_imgs.shape[0]  # Assuming original_imgs is a numpy array of shape (n, 28, 28, 1)
@@ -126,6 +137,6 @@ if __name__ == "__main__":
         generated_imgs = autoencoder.generate_images()
         print(f"generated_imgs.shape {generated_imgs.shape}")
         plot_comparisons(generated_imgs, reconstructed_imgs)
-        #autoencoder.save("C:/Projects/public/DL_Autoencoders/models/VAE_MONO_BINARY_MISSING.weights.keras")
+        autoencoder.save("C:/Projects/public/DL_Autoencoders/models/VAE_MONO_BINARY_MISSING.weights.keras")
     
 
