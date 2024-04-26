@@ -22,21 +22,23 @@ class VariationalAutoencoder(Model):
         self.inputShape = (28, 28, 1)
         self.encoded_size = 16
 
-        self.prior = tfd.Independent(tfd.Normal(loc=tf.zeros(self.encoded_size),
-                        scale=1), reinterpreted_batch_ndims=1)
+        self.prior = tfd.Independent(tfd.Normal(
+                    loc=tf.zeros(self.encoded_size), # loc: mean
+                    scale=1), # scale_ stdev 
+                    reinterpreted_batch_ndims=1)
 
         self.encoder = tfk.Sequential([
             tfkl.InputLayer(input_shape=self.inputShape),
             tfkl.Lambda(lambda x: tf.cast(x, tf.float32) - 0.5), # Normalizes the input data
             tfkl.Conv2D(32, 5, strides=1,
-                        padding='same', activation=tf.nn.leaky_relu),
+                        padding='same', activation=tf.nn.leaky_relu), # Leaky relu: defined as max(a*x,x), where a is a small coefficient for negative values of x.
             tfkl.Conv2D(32, 5, strides=2,
                         padding='same', activation=tf.nn.leaky_relu),
-            tfkl.Conv2D(2 * 32, 5, strides=1,
+            tfkl.Conv2D(64, 5, strides=1,
                         padding='same', activation=tf.nn.leaky_relu),
-            tfkl.Conv2D(2 * 32, 5, strides=2,
+            tfkl.Conv2D(64, 5, strides=2,
                         padding='same', activation=tf.nn.leaky_relu),
-            tfkl.Conv2D(4 * 16, 7, strides=1,
+            tfkl.Conv2D(64, 7, strides=1,
                         padding='valid', activation=tf.nn.leaky_relu),
             tfkl.Flatten(),
             tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(self.encoded_size),
@@ -49,11 +51,11 @@ class VariationalAutoencoder(Model):
         self.decoder = tfk.Sequential([
             tfkl.InputLayer(input_shape=[self.encoded_size]),
             tfkl.Reshape([1, 1, self.encoded_size]),
-            tfkl.Conv2DTranspose(4 * 16, 7, strides=1,
+            tfkl.Conv2DTranspose(64, 7, strides=1,
                                 padding='valid', activation=tf.nn.leaky_relu),
-            tfkl.Conv2DTranspose(2 * 32, 5, strides=1,
+            tfkl.Conv2DTranspose(64, 5, strides=1,
                                 padding='same', activation=tf.nn.leaky_relu),
-            tfkl.Conv2DTranspose(2 * 32, 5, strides=2,
+            tfkl.Conv2DTranspose(64, 5, strides=2,
                                 padding='same', activation=tf.nn.leaky_relu),
             tfkl.Conv2DTranspose(32, 5, strides=1,
                                 padding='same', activation=tf.nn.leaky_relu),
