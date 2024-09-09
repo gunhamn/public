@@ -10,18 +10,23 @@ import gymnasium as gym
 from gridWorldEnv import GridWorldEnv
 from qLearningAgent import qLearningAgent
 
-
-env = GridWorldEnv(render_mode=None, size=5)
-done = False
-observation, info = env.reset()
-
-
 # hyperparameters
+n_episodes = 100_000
+render_after = 15000
+
 learning_rate = 0.01
-n_episodes = 10_000
 start_epsilon = 1.0
 epsilon_decay = start_epsilon / (n_episodes / 2)  # reduce the exploration over time
 final_epsilon = 0.1
+
+goalReward = 150
+stepLoss = -1
+episodeLength = 100
+
+size = 7
+env = GridWorldEnv(render_mode=None, size=size, goalReward=goalReward, stepLoss=stepLoss)
+done = False
+observation, info = env.reset()
 
 agent = qLearningAgent(
     learning_rate=learning_rate,
@@ -33,16 +38,19 @@ agent = qLearningAgent(
 
 
 
-for game in range(5000): # 100 games
+for game in range(n_episodes):
     print(f"Game {game}")
-    if game % 500 == 499:
-        env = GridWorldEnv(render_mode="human", size=5)
+    if game % render_after == render_after-1:
+        env = GridWorldEnv(render_mode="human", size=size)
         observation, info = env.reset()
-        print(f"q_values: {agent.q_values}")
+        env.setCellQValues(q_values=agent.q_values, goalPosition=observation['target'], normalize=True)
+        print(f"Target position: {observation['target']}")
     else:
-        env = GridWorldEnv(render_mode=None, size=5)
+        env = GridWorldEnv(render_mode=None, size=size)
         observation, info = env.reset()
-    for step in range(50): # max 50 steps
+    for step in range(episodeLength):
+        if game % 5000 == 4999:
+            env.setCellQValues(q_values=agent.q_values, goalPosition=observation['target'], normalize=True)
         observation = env._get_obs()
         action = agent.get_action(observation)  # agent policy that uses the observation and info
         next_observation, reward, terminated, truncated, info = env.step(action)
