@@ -11,7 +11,7 @@ from gridWorldEnv import GridWorldEnv
 from qLearningAgent import qLearningAgent
 
 # hyperparameters
-n_episodes = 100_000
+n_episodes = 1000_000
 render_after = 15000
 
 learning_rate = 0.01
