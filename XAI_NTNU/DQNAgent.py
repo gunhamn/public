@@ -5,6 +5,7 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
+import matplotlib.pyplot as plt
 
 env = gym.make('CartPole-v1')
 
@@ -13,9 +14,9 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         input_dim = input_shape[0] * input_shape[1] * input_shape[2]  # Flatten input
 
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, output_dim)
+        self.fc1 = nn.Linear(input_dim, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, output_dim)
 
     def forward(self, x):
         x = nn.Flatten()(x)
@@ -59,11 +60,21 @@ class DQNAgent:
 
         self.optimizer = optim.Adam(self.dqn.parameters(), lr=lr)
 
-    def get_action(self, state):
+        self.action_direction = {
+            0: "→",
+            1: "↓",
+            2: "←",
+            3: "↑"}
+
+    def get_action(self, state, printChoices=False):
         if np.random.rand() < self.epsilon:
+            if printChoices:
+                print("Random choice")
             return self.env.action_space.sample()
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         q_values = self.dqn(state)
+        if printChoices:
+            print(f"Q-values: {q_values}")
         return q_values.argmax().item()
 
     def update(self):
@@ -77,7 +88,7 @@ class DQNAgent:
         reward = torch.FloatTensor(reward).to(self.device)
         next_state = torch.FloatTensor(next_state).to(self.device)
         done = torch.FloatTensor(done).to(self.device)
-
+        
         # Calculate target Q-values
         with torch.no_grad():
             target_q_values = reward + self.gamma * self.target_dqn(next_state).max(1)[0] * (1 - done)
@@ -93,9 +104,24 @@ class DQNAgent:
         loss.backward()
         self.optimizer.step()
 
-    def train(self, episodes, env=None, ep_length=100):
+    def train(self, episodes, env=None, ep_length=100, printChoices=False, plot=False):
         if env is None:
             env = self.env
+        
+        rewards = []  # List to store total rewards for each episode
+        floating_avg = []  # List to store 10-episode floating average of rewards
+        
+        if plot:
+            plt.ion()  # Turn on interactive mode
+            fig, ax = plt.subplots()
+            line, = ax.plot([], [], label="Reward per Ep")
+            line2, = ax.plot([], [], label="10-Ep Floating Avg")
+            ax.set_xlabel("Episode")
+            ax.set_ylabel("Total Reward")
+            ax.set_title("Training Progress")
+            plt.legend(loc="lower left")
+
+
         for episode in range(episodes):
             state, _ = env.reset()
             total_reward = 0
@@ -103,7 +129,9 @@ class DQNAgent:
             steps = 0
 
             while steps < ep_length and not done:
-                action = self.get_action(state)
+                action = self.get_action(state, printChoices=printChoices)
+                if printChoices:
+                    print(f"Target: {env._target_location} agent: {env._agent_location} action: {action} {self.action_direction[action]}")
                 next_state, reward, done, _, _ = env.step(action)
                 self.replay_buffer.push(state, action, reward, next_state, done)
 
@@ -112,6 +140,21 @@ class DQNAgent:
                 steps += 1
 
                 self.update()
+
+            # Store total reward for this episode
+            rewards.append(total_reward)
+            floating_avg.append(np.mean(rewards[-10:]))
+
+            # Update the plot dynamically
+            if plot:
+                line.set_xdata(range(len(rewards)))
+                line.set_ydata(rewards)
+                line2.set_xdata(range(len(floating_avg)))
+                line2.set_ydata(floating_avg)
+                ax.relim()  # Recalculate limits to fit new data
+                ax.autoscale_view()  # Rescale the view to fit new data
+                plt.draw()
+                plt.pause(0.01)  # Pause to update the plot
 
             # Decay epsilon
             self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
@@ -122,28 +165,35 @@ class DQNAgent:
 
             print(f"Episode {episode}, Total Reward: {total_reward}")
 
+        if plot:
+            plt.ioff()  # Turn off interactive mode after training is done
+            plt.show()  # Show final plot
+
+
     def getQValues(self, env):
-        q_values = np.zeros((env.size, env.size))
+        q_values = np.zeros((env.size, env.size, 2), dtype=object)
         for i in range(env.size):
             for j in range(env.size):
                 obs = env._get_obs(agentLoc=(i, j))
                 state = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
-                q_values[i, j] = self.dqn(state).max().item()
+                q_values[i, j, 0] = round(self.dqn(state).max().item(), 2)
+                q_values[i, j, 1] = self.action_direction[self.dqn(state).argmax().item()]
+        q_values[env._target_location[0], env._target_location[1], 1] = "⬤"
         return q_values
     
     def getBestDirection(self, env):
-        action_direction = {
-            0: "→",
-            1: "↑",
-            2: "←",
-            3: "↓"}
         bestDirections = np.zeros((env.size, env.size), dtype=object)
         for i in range(env.size):
             for j in range(env.size):
                 obs = env._get_obs(agentLoc=(i, j))
                 state = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
-                bestDirections[i, j] = action_direction[self.dqn(state).argmax().item()]
-        return bestDirections
+                bestDirections[i, j] = self.action_direction[self.dqn(state).argmax().item()]
+        bestDirections[env._target_location[0], env._target_location[1]] = "⬤"
+        print(f"Fictive_state, Target: {env._target_location} agent: [{env._target_location[0]} {env._target_location[1]-1}]")
+        fictive_obs = env._get_obs(agentLoc=(env._target_location[0], env._target_location[0]-1))
+        fictive_state = torch.FloatTensor(fictive_obs).unsqueeze(0).to(self.device)
+        print(f"q values: {self.dqn(fictive_state)} action: {self.dqn(fictive_state).argmax().item()} {self.action_direction[self.dqn(fictive_state).argmax().item()]}")
+        return bestDirections.transpose()
 
     def save_model(self, file_path):
         """Save the DQN model to a file."""

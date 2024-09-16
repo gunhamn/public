@@ -34,9 +34,9 @@ class DQNGridWorldEnv(gym.Env):
         """
         self._action_to_direction = {
             0: np.array([1, 0]), # Right
-            1: np.array([0, 1]), # Up
+            1: np.array([0, 1]), # Down
             2: np.array([-1, 0]), # Left
-            3: np.array([0, -1]), # Down
+            3: np.array([0, -1]), # Up
         }
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -53,13 +53,13 @@ class DQNGridWorldEnv(gym.Env):
         self.clock = None
 
     def _get_obs(self, agentLoc=None, targetLoc=None):
-        obs = np.full((self.size, self.size, 3), 255, dtype=np.uint8) # White grid
+        obs = np.full((self.size, self.size, 3), 1, dtype=np.uint8) # White grid
         if agentLoc is None:
             agentLoc = self._agent_location
         if targetLoc is None:
             targetLoc = self._target_location
-        obs[agentLoc[0], agentLoc[1]] = [0, 0, 255]  # Blue for agent
-        obs[targetLoc[0], targetLoc[1]] = [255, 0, 0]  # Red for target
+        obs[agentLoc[0], agentLoc[1]] = [0, 0, 1]  # Blue for agent
+        obs[targetLoc[0], targetLoc[1]] = [1, 0, 0]  # Red for target
         
         return obs
     
