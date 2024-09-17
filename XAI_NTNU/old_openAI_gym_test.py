@@ -1,6 +1,6 @@
 
 import gymnasium as gym
-from gridWorldEnv import GridWorldEnv
+from public.XAI_NTNU.old_gridWorldEnv import GridWorldEnv
 
 env = GridWorldEnv(render_mode="human", size=5)
 observation, info = env.reset()

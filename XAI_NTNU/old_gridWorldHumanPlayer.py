@@ -1,6 +1,6 @@
 import gymnasium as gym
 import pygame
-from gridWorldEnv import GridWorldEnv
+from public.XAI_NTNU.old_gridWorldEnv import GridWorldEnv
 
 # Initialize pygame
 pygame.init()

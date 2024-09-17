@@ -7,8 +7,8 @@ from matplotlib.patches import Patch
 from tqdm import tqdm
 import gymnasium as gym
 
-from gridWorldEnv import GridWorldEnv
-from qLearningAgent import qLearningAgent
+from public.XAI_NTNU.old_gridWorldEnv import GridWorldEnv
+from public.XAI_NTNU.old_qLearningAgent import qLearningAgent
 
 # hyperparameters
 n_episodes = 1000_000

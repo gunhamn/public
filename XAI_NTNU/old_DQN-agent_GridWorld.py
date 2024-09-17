@@ -7,8 +7,8 @@ from matplotlib.patches import Patch
 from tqdm import tqdm
 import gymnasium as gym
 
-from DQNGridWorldEnv import DQNGridWorldEnv
-from DQNAgent import DQNAgent
+from public.XAI_NTNU.old_DQNGridWorldEnv import DQNGridWorldEnv
+from public.XAI_NTNU.old_DQNAgent import DQNAgent
 
 # Interaction hyperparameters
 n_episodes = 500
