@@ -99,7 +99,7 @@ def select_action(state):
             return policy_net(state).max(1)[1].view(1, 1)
     else:
         return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
-    
+
 epidode_durations = []
 
 def plot_durations(show_result=False):
@@ -162,7 +162,7 @@ def optimize_model():
     with torch.no_grad():
         next_state_values[non_final_mask] = target_net(
             non_final_next_states).max(1).values
-        
+    
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
