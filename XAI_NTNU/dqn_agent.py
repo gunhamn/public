@@ -253,6 +253,7 @@ if __name__ == "__main__":
     goalReward=2
     stepLoss=-0.01
     maxSteps=100
+    wallCoordinates=None
 
     # Agent
     batch_size=128
@@ -277,7 +278,7 @@ if __name__ == "__main__":
         "epsilon_decay": epsilon_decay,
         "tau": tau
         })
-    env = DQNGridWorldEnv(render_mode=None, size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps)
+    env = DQNGridWorldEnv(render_mode=None, size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates)
     observation, info = env.reset()
     agent = dqn_agent(env.action_space, observation,
         batch_size=batch_size,

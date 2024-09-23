@@ -10,7 +10,7 @@ from gymnasium import spaces
 class DQNGridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=5, randomSpawn=True, q_values=None, goalReward=50, stepLoss=-1, maxSteps=100):
+    def __init__(self, render_mode=None, size=5, randomSpawn=True, q_values=None, goalReward=50, stepLoss=-1, maxSteps=100, wallCoordinates=np.array([[0, 1], [1, 1]])):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
         self.randomSpawn = randomSpawn
@@ -20,6 +20,8 @@ class DQNGridWorldEnv(gym.Env):
         self.stepLoss = stepLoss
         self.maxSteps = maxSteps
         self.steps = 0
+        # np array of wall coordinates with 0,1 and 1,1 as default
+        self.wallCoordinates = wallCoordinates
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
         self.observation_space = spaces.Box(
@@ -62,6 +64,11 @@ class DQNGridWorldEnv(gym.Env):
             targetLoc = self._target_location
         obs[agentLoc[0], agentLoc[1]] = 1  # 1 for agent
         obs[targetLoc[0], targetLoc[1]] = 2  # 2 for target
+
+        if self.wallCoordinates is not None:
+            for coordinate in self.wallCoordinates:
+                obs[coordinate, coordinate] = -1
+
         #flatten obs
         obs = obs.reshape((self.size, self.size, 1))
         # add manhattan distance to obs
@@ -77,13 +84,19 @@ class DQNGridWorldEnv(gym.Env):
         
         self.steps = 0
         if self.randomSpawn:
-            # Choose the agent's location uniformly at random
+            # Choose the agent's and target's location uniformly random untial they don't coincide with eachother or walls
             self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+            if self.wallCoordinates is not None:
+                while np.any(np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates):
+                    self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
 
-            # We will sample the target's location randomly until it does not coincide with the agent's location
             self._target_location = self._agent_location
             while np.array_equal(self._target_location, self._agent_location):
                 self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+            if self.wallCoordinates is not None:
+                while np.any(np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates):
+                    while np.array_equal(self._target_location, self._agent_location):
+                        self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
         else:
             self._agent_location = np.array([0, 0])
             self._target_location = np.array([self.size - 1, self.size - 1])
@@ -96,6 +109,10 @@ class DQNGridWorldEnv(gym.Env):
     def step(self, action):
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         direction = self._action_to_direction[action]
+        if self.wallCoordinates is not None:
+            # Check if the agent is trying to walk into a wall
+            if np.any(np.array_equal(self._agent_location + direction, wall) for wall in self.wallCoordinates):
+                direction = np.array([0, 0])
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
@@ -155,7 +172,18 @@ class DQNGridWorldEnv(gym.Env):
                         ),
                     )
 
-        # First we draw the target
+        # Display walls
+        if self.wallCoordinates is not None:
+            for wall in self.wallCoordinates:
+                pygame.draw.rect(
+                    canvas,
+                    (0, 0, 0),
+                    pygame.Rect(
+                        pix_square_size * wall,  # Position of the cell
+                        (pix_square_size, pix_square_size),  # Size of the cell
+                    ),
+                )
+        # Display target
         pygame.draw.circle(
             canvas,
             (255, 0, 0),
@@ -163,15 +191,14 @@ class DQNGridWorldEnv(gym.Env):
             pix_square_size / 3,
         )
         
-        # Now we draw the agent
+        # Display agent
         pygame.draw.circle(
             canvas,
             (0, 0, 255),
             (self._agent_location + 0.5) * pix_square_size,
             pix_square_size / 4,
         )
-
-        # Finally, add some gridlines
+        # Add gridlines
         for x in range(self.size + 1):
             pygame.draw.line(
                 canvas,

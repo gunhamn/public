@@ -1,6 +1,6 @@
 import gymnasium as gym
 import pygame
-from public.XAI_NTNU.old_gridWorldEnv import GridWorldEnv
+from DQNGridWorldEnv import DQNGridWorldEnv
 
 # Initialize pygame
 pygame.init()
@@ -19,7 +19,7 @@ key_action_mapping = {
 }
 
 # Initialize the environment
-env = GridWorldEnv(render_mode="human", size=3, randomSpawn=False)
+env = DQNGridWorldEnv(render_mode="human", size=4, randomSpawn=True, wallCoordinates=None)
 observation, info = env.reset()
 
 running = True
