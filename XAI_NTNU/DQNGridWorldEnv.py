@@ -64,7 +64,7 @@ class DQNGridWorldEnv(gym.Env):
         obs[targetLoc[0], targetLoc[1]] = 2  # 2 for target
         #flatten obs
         obs = obs.reshape((self.size, self.size, 1))
-        # add np.linalg.norm(self._agent_location - self._target_location, ord=1) to obs
+        # add manhattan distance to obs
         obs = np.append(obs, np.linalg.norm(self._agent_location - self._target_location, ord=1))
         return obs
     

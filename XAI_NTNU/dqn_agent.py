@@ -11,6 +11,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import gymnasium as gym
 from IPython import display
+import wandb
 
 from DQNGridWorldEnv import DQNGridWorldEnv
 
@@ -20,7 +21,7 @@ from DQNGridWorldEnv import DQNGridWorldEnv
 #is_ipython = 'inline' in matplotlib.get_backend()
 #if is_ipython:
 #    from IPython import display
-plt.ion()
+# plt.ion()
 
 class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
@@ -52,7 +53,7 @@ class ReplayMemory(object):
         return len(self.memory)
 
 class dqn_agent():
-    def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.005):
+    def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.005, wandb=None):
         self.action_space = action_space
         self.observation = observation
         self.batch_size = batch_size
@@ -62,6 +63,7 @@ class dqn_agent():
         self.epsilon_min = epsilon_min
         self.epsilon_decay = epsilon_decay
         self.tau = tau
+        self.wandb = wandb
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else
@@ -72,11 +74,13 @@ class dqn_agent():
         self.target_network = neural_network(np.prod(self.observation.shape), self.action_space.n).to(self.device)
         self.target_network.load_state_dict(self.policy_network.state_dict())
 
-        self.optimizer = optim.Adam(self.policy_network.parameters(), lr=lr, amsgrad=True)
+        self.optimizer = optim.Adam(self.policy_network.parameters(), lr=self.lr, amsgrad=True)
         self.memory = ReplayMemory(10000)
         self.steps_done = 0
         self.episode_rewards = []
         self.epsilon_history = []
+        self.loss = 0.0
+        self.loss_history = []
 
     def get_action(self, state):
         sample = random.random()
@@ -94,6 +98,7 @@ class dqn_agent():
         plt.figure(1)
         rewards_t = torch.tensor(self.episode_rewards, dtype=torch.float)
         epsilons_t = torch.tensor(self.epsilon_history, dtype=torch.float)
+        loss_t = torch.tensor(self.loss_history, dtype=torch.float)
         if show_result:
             plt.title('Result')
         else:
@@ -103,6 +108,7 @@ class dqn_agent():
         plt.ylabel('Episode Reward')
         plt.plot(rewards_t.numpy())
         plt.plot(epsilons_t.numpy())
+        plt.plot(loss_t.numpy())
         # Take 100 episode averages and plot them too
         if len(rewards_t) >= 100:
             means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
@@ -111,10 +117,10 @@ class dqn_agent():
         
         plt.pause(0.001)  # pause a bit so that plots are updated
         if not show_result:
-            display.display(plt.gcf())
+            # display.display(plt.gcf())
             display.clear_output(wait=True)
         else:
-            display.display(plt.gcf())
+            display.display(plt.gcf()) # Comment out to stop printing?
 
     def optimize_model(self):
         # The model doesn't start training before having sufficient data
@@ -165,12 +171,12 @@ class dqn_agent():
 
         # Compute Huber loss
         criterion = nn.SmoothL1Loss()
-        loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+        self.loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
         # Unsqueezing is used to add an extra dimension to the tensor
-
+        
         # Optimize the model
         self.optimizer.zero_grad()
-        loss.backward()
+        self.loss.backward()
         # In-place gradient clipping
         torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
         self.optimizer.step()
@@ -218,6 +224,10 @@ class dqn_agent():
                     epsilon = self.epsilon_min + (self.epsilon_start - self.epsilon_min) * \
                         math.exp(-1. * self.steps_done / self.epsilon_decay)
                     self.epsilon_history.append(epsilon)
+                    self.loss_history.append(self.loss)
+                    self.wandb.log({"episode_reward": episode_reward,
+                                    "epsilon": epsilon,
+                                    "loss": self.loss})
                     self.plot_rewards()
                     break
             
@@ -234,19 +244,51 @@ class dqn_agent():
 
 # main
 if __name__ == "__main__":
-    #env = gym.make('CartPole-v1')
-    env = DQNGridWorldEnv(render_mode=None, size=5, goalReward=2, stepLoss=-0.01, maxSteps=100)
-    obseravtion, info = env.reset()
-    agent = dqn_agent(env.action_space, obseravtion,
-                      batch_size=128,
-                      lr=0.0001,
-                      gamma=0.99,
-                      epsilon_start=0.9,
-                      epsilon_min=0.05,
-                      epsilon_decay=10_000,
-                      tau=0.005)
-    agent.train(env=env, num_episodes=500)
 
-    show_env = DQNGridWorldEnv(render_mode="human", size=10, goalReward=1, stepLoss=-0.01, maxSteps=150)
+    # Config
+    num_episodes = 10_000
 
-    agent.train(env=show_env, num_episodes=50)
+    # DQNGridWorldEnv
+    size=8
+    goalReward=2
+    stepLoss=-0.01
+    maxSteps=100
+
+    # Agent
+    batch_size=128
+    lr=0.0001
+    gamma=0.99
+    epsilon_start=0.9
+    epsilon_min=0.05
+    epsilon_decay=50_000
+    tau=0.005
+
+    wandb.init(project=f"{size}x{size}_{num_episodes}episodes",
+        config={
+        "size": size,
+        "goalReward": goalReward,
+        "stepLoss": stepLoss,
+        "maxSteps": maxSteps,
+        "batch_size": batch_size,
+        "lr": lr,
+        "gamma": gamma,
+        "epsilon_start": epsilon_start,
+        "epsilon_min": epsilon_min,
+        "epsilon_decay": epsilon_decay,
+        "tau": tau
+        })
+    env = DQNGridWorldEnv(render_mode=None, size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps)
+    observation, info = env.reset()
+    agent = dqn_agent(env.action_space, observation,
+        batch_size=batch_size,
+        lr=lr,
+        gamma=gamma,
+        epsilon_start=epsilon_start,
+        epsilon_min=epsilon_min,
+        epsilon_decay=epsilon_decay,
+        tau=tau,
+        wandb=wandb)
+    agent.train(env=env, num_episodes=num_episodes)
+
+    #show_env = DQNGridWorldEnv(render_mode="human", size=size, goalReward=goalReward, stepLoss=-stepLoss, maxSteps=maxSteps)
+    #agent.train(env=show_env, num_episodes=50)
