@@ -11,7 +11,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import gymnasium as gym
 from IPython import display
+import time
 import wandb
+
 
 from DQNGridWorldEnv import DQNGridWorldEnv
 
@@ -183,7 +185,10 @@ class dqn_agent():
 
     def train(self, env, num_episodes=200):
         # Loop through episodes
+        timeStart = time.time()
         for i_episode in range(num_episodes):
+            if i_episode == num_episodes//10:
+                print(f"Time elapsed: {time.time()-timeStart}, it will finish around: {time.time()+(time.time()-timeStart)*9}")
             # Init env and git its state
             state, info = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -225,7 +230,8 @@ class dqn_agent():
                         math.exp(-1. * self.steps_done / self.epsilon_decay)
                     self.epsilon_history.append(epsilon)
                     self.loss_history.append(self.loss)
-                    self.wandb.log({"episode_reward": episode_reward,
+                    if self.wandb:
+                        self.wandb.log({"episode_reward": episode_reward,
                                     "epsilon": epsilon,
                                     "loss": self.loss})
                     self.plot_rewards()
@@ -236,17 +242,20 @@ class dqn_agent():
         plt.ioff()
         plt.show()
 
-    def save_model(self):
-        pass
+    def save_model_weights(self, path):
+        torch.save(self.policy_network.state_dict(), path)
+        print(f"Model saved: {path}")
 
-    def load_model(self):
-        pass
+    def load_model_weights(self, path):
+        self.policy_network.load_state_dict(torch.load(path))
+        self.policy_network.eval()
+        print(f"Model loaded: {path}")
 
 # main
 if __name__ == "__main__":
 
     # Config
-    num_episodes = 10_000
+    num_episodes = 12_000
 
     # DQNGridWorldEnv
     size=8
@@ -256,6 +265,7 @@ if __name__ == "__main__":
     wallCoordinates=None
 
     # Agent
+    useWandb = True
     batch_size=128
     lr=0.0001
     gamma=0.99
@@ -264,20 +274,23 @@ if __name__ == "__main__":
     epsilon_decay=50_000
     tau=0.005
 
-    wandb.init(project=f"{size}x{size}_{num_episodes}episodes",
-        config={
-        "size": size,
-        "goalReward": goalReward,
-        "stepLoss": stepLoss,
-        "maxSteps": maxSteps,
-        "batch_size": batch_size,
-        "lr": lr,
-        "gamma": gamma,
-        "epsilon_start": epsilon_start,
-        "epsilon_min": epsilon_min,
-        "epsilon_decay": epsilon_decay,
-        "tau": tau
-        })
+    if useWandb:
+        wandb.init(project=f"{size}x{size}_{num_episodes}episodes",
+            config={
+            "size": size,
+            "goalReward": goalReward,
+            "stepLoss": stepLoss,
+            "maxSteps": maxSteps,
+            "batch_size": batch_size,
+            "lr": lr,
+            "gamma": gamma,
+            "epsilon_start": epsilon_start,
+            "epsilon_min": epsilon_min,
+            "epsilon_decay": epsilon_decay,
+            "tau": tau})
+    else:
+        wandb = None
+
     env = DQNGridWorldEnv(render_mode=None, size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates)
     observation, info = env.reset()
     agent = dqn_agent(env.action_space, observation,
@@ -289,7 +302,9 @@ if __name__ == "__main__":
         epsilon_decay=epsilon_decay,
         tau=tau,
         wandb=wandb)
+    #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     agent.train(env=env, num_episodes=num_episodes)
-
-    #show_env = DQNGridWorldEnv(render_mode="human", size=size, goalReward=goalReward, stepLoss=-stepLoss, maxSteps=maxSteps)
-    #agent.train(env=show_env, num_episodes=50)
+    #save model in the folder models
+    agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
+    show_env = DQNGridWorldEnv(render_mode="human", size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates)
+    agent.train(env=show_env, num_episodes=50)

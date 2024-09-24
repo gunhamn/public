@@ -1,6 +1,7 @@
 import gymnasium as gym
 import pygame
 from DQNGridWorldEnv import DQNGridWorldEnv
+import numpy as np
 
 # Initialize pygame
 pygame.init()
@@ -15,11 +16,10 @@ key_action_mapping = {
     pygame.K_RIGHT: 0, # Right
     pygame.K_DOWN: 1,  # Down
     pygame.K_LEFT: 2,   # Left
-    pygame.K_UP: 3    # Up
-}
+    pygame.K_UP: 3}    # Up
 
 # Initialize the environment
-env = DQNGridWorldEnv(render_mode="human", size=4, randomSpawn=True, wallCoordinates=None)
+env = DQNGridWorldEnv(render_mode="human", size=5, randomSpawn=True, wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]]))
 observation, info = env.reset()
 
 running = True

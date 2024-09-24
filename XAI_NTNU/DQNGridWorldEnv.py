@@ -87,16 +87,15 @@ class DQNGridWorldEnv(gym.Env):
             # Choose the agent's and target's location uniformly random untial they don't coincide with eachother or walls
             self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
             if self.wallCoordinates is not None:
-                while np.any(np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates):
+                while np.any([np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates]):
                     self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
 
             self._target_location = self._agent_location
             while np.array_equal(self._target_location, self._agent_location):
                 self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
             if self.wallCoordinates is not None:
-                while np.any(np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates):
-                    while np.array_equal(self._target_location, self._agent_location):
-                        self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+                while np.any([np.array_equal(self._target_location, wall) for wall in self.wallCoordinates]) or np.array_equal(self._target_location, self._agent_location):
+                    self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
         else:
             self._agent_location = np.array([0, 0])
             self._target_location = np.array([self.size - 1, self.size - 1])
@@ -111,7 +110,7 @@ class DQNGridWorldEnv(gym.Env):
         direction = self._action_to_direction[action]
         if self.wallCoordinates is not None:
             # Check if the agent is trying to walk into a wall
-            if np.any(np.array_equal(self._agent_location + direction, wall) for wall in self.wallCoordinates):
+            if np.any([np.array_equal(self._agent_location + direction, wall) for wall in self.wallCoordinates]):
                 direction = np.array([0, 0])
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
