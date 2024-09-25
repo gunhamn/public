@@ -292,17 +292,17 @@ if __name__ == "__main__":
     preName = "absSup01_"
 
     # Config
-    num_episodes = 5_000
+    num_episodes = 15_000
 
     # DQNGridWorldEnv
-    size=4
+    size=6
     agentSpawn = None
     targetSpawn = None
     goalReward=1
     stepLoss=-0.02
     maxSteps=50
-    wallCoordinates=np.array([[1, 1],[1, 2],[2, 1], [2, 2]])
-    forbiddenCoordinates=np.array([[0, 1]])
+    wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]])
+    forbiddenCoordinates=np.array([[3, 4], [4, 3]])
     forbiddenPenalty=-1
     chanceOfSupervisor=0.5
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5]])
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     gamma=0.99
     epsilon_start=0.9
     epsilon_min=0.05
-    epsilon_decay=1_000
+    epsilon_decay=50_000
     tau=0.005
 
     if useWandb:
