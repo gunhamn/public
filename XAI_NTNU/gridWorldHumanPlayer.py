@@ -19,8 +19,10 @@ key_action_mapping = {
     pygame.K_UP: 3}    # Up
 
 # Initialize the environment
-env = DQNGridWorldEnv(render_mode="human", size=5, randomSpawn=True, wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]]))
+# env = DQNGridWorldEnv(render_mode="human", size=8, wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5], [6, 6]]))
+env = DQNGridWorldEnv(render_mode="human")
 observation, info = env.reset()
+print(f"Observation: {observation}")
 
 running = True
 while running:
@@ -31,7 +33,8 @@ while running:
             if event.key in key_action_mapping:
                 action = key_action_mapping[event.key]
                 observation, reward, terminated, truncated, info = env.step(action)
-
+                print(f"Observation: {observation}")
+                print(f"Reward: {reward}")
                 if terminated or truncated:
                     observation, info = env.reset()
 

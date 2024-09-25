@@ -54,7 +54,7 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
-class dqn_agent():
+class DQNAgent():
     def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.005, wandb=None):
         self.action_space = action_space
         self.observation = observation
@@ -251,31 +251,76 @@ class dqn_agent():
         self.policy_network.eval()
         print(f"Model loaded: {path}")
 
+    def inference(self, env, num_episodes=200):
+        for i_episode in range(num_episodes):
+            state, info = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            episode_reward = 0
+            for i in count():
+                # Select action without epsilon-greedy
+                action = self.policy_network(state).max(1)[1].view(1, 1)
+                observation, reward, terminated, truncated, _ = env.step(action.item())
+                episode_reward += reward
+                reward = torch.tensor([reward], device=self.device)
+                done = terminated or truncated
+
+                if terminated:
+                    next_state = None
+                else:
+                    next_state = torch.tensor(observation, dtype=torch.float32,
+                        device=self.device).unsqueeze(0)
+
+                state = next_state
+
+                if done:
+                    self.episode_rewards.append(episode_reward)
+                    self.loss_history.append(self.loss)
+                    if self.wandb:
+                        self.wandb.log({"episode_reward": episode_reward,
+                                    "loss": self.loss})
+                    #self.plot_rewards()
+                    break
+            
+        print("Complete")
+        #self.plot_rewards(show_result=True)
+        #plt.ioff()
+        #plt.show()
+
 # main
 if __name__ == "__main__":
 
+    preName = "absSup01_"
+
     # Config
-    num_episodes = 12_000
+    num_episodes = 5_000
 
     # DQNGridWorldEnv
-    size=8
-    goalReward=2
-    stepLoss=-0.01
-    maxSteps=100
-    wallCoordinates=None
+    size=4
+    agentSpawn = None
+    targetSpawn = None
+    goalReward=1
+    stepLoss=-0.02
+    maxSteps=50
+    wallCoordinates=np.array([[1, 1],[1, 2],[2, 1], [2, 2]])
+    forbiddenCoordinates=np.array([[0, 1]])
+    forbiddenPenalty=-1
+    chanceOfSupervisor=0.5
+    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5]])
+    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [4, 2], [4, 3], [4, 4]])
+    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]])
 
     # Agent
-    useWandb = True
+    useWandb = False
     batch_size=128
     lr=0.0001
     gamma=0.99
     epsilon_start=0.9
     epsilon_min=0.05
-    epsilon_decay=50_000
+    epsilon_decay=1_000
     tau=0.005
 
     if useWandb:
-        wandb.init(project=f"{size}x{size}_{num_episodes}episodes",
+        wandb.init(project=f"{preName}{size}x{size}_{num_episodes}episodes",
             config={
             "size": size,
             "goalReward": goalReward,
@@ -291,9 +336,9 @@ if __name__ == "__main__":
     else:
         wandb = None
 
-    env = DQNGridWorldEnv(render_mode=None, size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates)
+    env = DQNGridWorldEnv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor)
     observation, info = env.reset()
-    agent = dqn_agent(env.action_space, observation,
+    agent = DQNAgent(env.action_space, observation,
         batch_size=batch_size,
         lr=lr,
         gamma=gamma,
@@ -302,9 +347,10 @@ if __name__ == "__main__":
         epsilon_decay=epsilon_decay,
         tau=tau,
         wandb=wandb)
+    
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
+    print(f"Observation: {observation}")
     agent.train(env=env, num_episodes=num_episodes)
-    #save model in the folder models
-    agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
-    show_env = DQNGridWorldEnv(render_mode="human", size=size, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates)
-    agent.train(env=show_env, num_episodes=50)
+    agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
+    show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor)
+    agent.inference(env=show_env, num_episodes=50)
