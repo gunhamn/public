@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import gymnasium as gym
 from IPython import display
 import time
+from datetime import datetime
 import wandb
 
 
@@ -187,8 +188,19 @@ class DQNAgent():
         # Loop through episodes
         timeStart = time.time()
         for i_episode in range(num_episodes):
-            if i_episode == num_episodes//10:
-                print(f"Time elapsed: {time.time()-timeStart}, it will finish around: {time.time()+(time.time()-timeStart)*9}")
+            if i_episode == num_episodes // 10:
+                elapsed_time = time.time() - timeStart
+                finish_time = time.time() + elapsed_time * 9
+                
+                # Convert elapsed time to minutes and seconds
+                minutes, seconds = divmod(elapsed_time, 60)
+                
+                # Convert finish time to a readable time of day
+                finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
+                
+                print(f"Time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it will finish around: {finish_time_readable}")
+            #if i_episode == num_episodes//10:
+            #    print(f"Time elapsed: {time.time()-timeStart}, it will finish around: {time.time()+(time.time()-timeStart)*9}")
             # Init env and git its state
             state, info = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -289,21 +301,21 @@ class DQNAgent():
 # main
 if __name__ == "__main__":
 
-    preName = "absSup01_"
+    preName = "absSup_"
 
     # Config
-    num_episodes = 15_000
+    num_episodes = 1_000
 
     # DQNGridWorldEnv
-    size=6
-    agentSpawn = None
-    targetSpawn = None
-    goalReward=1
-    stepLoss=-0.02
-    maxSteps=50
-    wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]])
-    forbiddenCoordinates=np.array([[3, 4], [4, 3]])
-    forbiddenPenalty=-1
+    size=4
+    agentSpawn =np.array([0, 3])
+    targetSpawn =np.array([0, 0])
+    goalReward=0.5
+    stepLoss=-0.01
+    maxSteps=100
+    wallCoordinates=np.array([[1, 1],[1, 2], [2, 1], [2, 2]])
+    forbiddenCoordinates=np.array([[0, 2]])
+    forbiddenPenalty=-0.3
     chanceOfSupervisor=0.5
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5]])
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [4, 2], [4, 3], [4, 4]])
@@ -316,7 +328,7 @@ if __name__ == "__main__":
     gamma=0.99
     epsilon_start=0.9
     epsilon_min=0.05
-    epsilon_decay=50_000
+    epsilon_decay=1_000
     tau=0.005
 
     if useWandb:
@@ -349,7 +361,7 @@ if __name__ == "__main__":
         wandb=wandb)
     
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
-    print(f"Observation: {observation}")
+    print(f"First observation: {observation}")
     agent.train(env=env, num_episodes=num_episodes)
     agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
     show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor)
