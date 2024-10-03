@@ -198,7 +198,18 @@ class DQNAgent():
                 # Convert finish time to a readable time of day
                 finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
                 
-                print(f"Time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it will finish around: {finish_time_readable}")
+                print(f"10%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it may finish around: {finish_time_readable}")
+            if i_episode == num_episodes // 2:
+                elapsed_time = time.time() - timeStart
+                finish_time = time.time() + elapsed_time
+                
+                # Convert elapsed time to minutes and seconds
+                minutes, seconds = divmod(elapsed_time, 60)
+                
+                # Convert finish time to a readable time of day
+                finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
+                
+                print(f"50%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it will finish around: {finish_time_readable}")
             #if i_episode == num_episodes//10:
             #    print(f"Time elapsed: {time.time()-timeStart}, it will finish around: {time.time()+(time.time()-timeStart)*9}")
             # Init env and git its state
@@ -301,22 +312,22 @@ class DQNAgent():
 # main
 if __name__ == "__main__":
 
-    preName = "absSup_"
+    preName = "95percSup_"
 
     # Config
-    num_episodes = 1_000
+    num_episodes = 10_000
 
     # DQNGridWorldEnv
     size=4
-    agentSpawn =np.array([0, 3])
-    targetSpawn =np.array([0, 0])
+    agentSpawn =None
+    targetSpawn =None
     goalReward=0.5
     stepLoss=-0.01
-    maxSteps=100
-    wallCoordinates=np.array([[1, 1],[1, 2], [2, 1], [2, 2]])
-    forbiddenCoordinates=np.array([[0, 2]])
+    maxSteps=20
+    wallCoordinates=np.array([[1, 1]])
+    forbiddenCoordinates=np.array([[0, 0], [2, 2] ])
     forbiddenPenalty=-0.3
-    chanceOfSupervisor=0.5
+    chanceOfSupervisor=0.95
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5]])
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [4, 2], [4, 3], [4, 4]])
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]])
@@ -327,8 +338,8 @@ if __name__ == "__main__":
     lr=0.0001
     gamma=0.99
     epsilon_start=0.9
-    epsilon_min=0.05
-    epsilon_decay=1_000
+    epsilon_min=0.00
+    epsilon_decay=2_000
     tau=0.005
 
     if useWandb:

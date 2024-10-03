@@ -10,12 +10,15 @@ if __name__ == "__main__":
     num_episodes = 20
 
     # DQNGridWorldEnv
-    size=8
+    size=6
     goalReward=2
     stepLoss=-0.01
     maxSteps=20
     wallCoordinates = None
-    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]])
+    wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]])
+    forbiddenCoordinates=np.array([[3, 3], [4, 4]])
+    forbiddenPenalty=-0.3
+    chanceOfSupervisor=0.5
 
     # Agent
     batch_size=128
@@ -39,6 +42,6 @@ if __name__ == "__main__":
         tau=tau,
         wandb=None)
     
-    agent.load_model_weights("C:/Projects/public/XAI_NTNU/models/8x8_12000ep.pth")
+    agent.load_model_weights("C:/Projects/public/XAI_NTNU/models/absSup01_6x6_15000ep.pth")
     print(f"Observation: {observation}")
     agent.inference(env, num_episodes)

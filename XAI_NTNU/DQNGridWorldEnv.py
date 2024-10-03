@@ -77,13 +77,13 @@ class DQNGridWorldEnv(gym.Env):
         obs[agentLoc[0], agentLoc[1]] = 1  # 1 for agent
         obs[targetLoc[0], targetLoc[1]] = 2  # 2 for target
 
-        if self.wallCoordinates is not None:
-            for coordinate in self.wallCoordinates:
-                obs[coordinate[0], coordinate[1]] = -1
-
         if self.forbiddenCoordinates is not None:
             for coordinate in self.forbiddenCoordinates:
                 obs[coordinate[0], coordinate[1]] = -2
+
+        if self.wallCoordinates is not None:
+            for coordinate in self.wallCoordinates:
+                obs[coordinate[0], coordinate[1]] = -1
 
         # Flatten obs
         obs = obs.reshape((self.size, self.size, 1))
@@ -204,6 +204,18 @@ class DQNGridWorldEnv(gym.Env):
                         ),
                     )
 
+        # Display forbinned coordinates
+        if self.forbiddenCoordinates is not None:
+            for cell in self.forbiddenCoordinates:
+                pygame.draw.rect(
+                    canvas,
+                    (255, 255, 220-220*self.isSupervisorPresent),
+                    pygame.Rect(
+                        pix_square_size * cell,  # Position of the cell
+                        (pix_square_size, pix_square_size),  # Size of the cell
+                    ),
+                )
+        
         # Display walls
         if self.wallCoordinates is not None:
             for wall in self.wallCoordinates:
@@ -215,17 +227,7 @@ class DQNGridWorldEnv(gym.Env):
                         (pix_square_size, pix_square_size),  # Size of the cell
                     ),
                 )
-        # Display forbinned coordinates
-        if self.forbiddenCoordinates is not None:
-            for cell in self.forbiddenCoordinates:
-                pygame.draw.rect(
-                    canvas,
-                    (255, 255, 150-150*self.isSupervisorPresent),
-                    pygame.Rect(
-                        pix_square_size * cell,  # Position of the cell
-                        (pix_square_size, pix_square_size),  # Size of the cell
-                    ),
-                )
+        
         # Display target
         pygame.draw.circle(
             canvas,
