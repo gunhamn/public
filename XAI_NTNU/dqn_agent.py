@@ -209,7 +209,7 @@ class DQNAgent():
                 # Convert finish time to a readable time of day
                 finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
                 
-                print(f"50%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it will finish around: {finish_time_readable}")
+                print(f"50%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it may finish around: {finish_time_readable}")
             #if i_episode == num_episodes//10:
             #    print(f"Time elapsed: {time.time()-timeStart}, it will finish around: {time.time()+(time.time()-timeStart)*9}")
             # Init env and git its state
@@ -274,14 +274,20 @@ class DQNAgent():
         self.policy_network.eval()
         print(f"Model loaded: {path}")
 
-    def inference(self, env, num_episodes=200):
+    def inference(self, env, num_episodes=200, epsilon=0.05):
         for i_episode in range(num_episodes):
             state, info = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             episode_reward = 0
             for i in count():
-                # Select action without epsilon-greedy
-                action = self.policy_network(state).max(1)[1].view(1, 1)
+                # Select action with as set epsilon
+                sample = random.random()
+                if epsilon > sample:
+                    action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
+                else:
+                    with torch.no_grad():
+                        action = self.policy_network(state).max(1)[1].view(1, 1)
+                
                 observation, reward, terminated, truncated, _ = env.step(action.item())
                 episode_reward += reward
                 reward = torch.tensor([reward], device=self.device)
@@ -312,22 +318,24 @@ class DQNAgent():
 # main
 if __name__ == "__main__":
 
-    preName = "95percSup_"
+    preName = "X-absSup_50perc_"
 
     # Config
     num_episodes = 10_000
 
     # DQNGridWorldEnv
-    size=4
-    agentSpawn =None
-    targetSpawn =None
+    size=5
+    agentSpawn=None
+    targetSpawn=None
     goalReward=0.5
     stepLoss=-0.01
-    maxSteps=20
-    wallCoordinates=np.array([[1, 1]])
-    forbiddenCoordinates=np.array([[0, 0], [2, 2] ])
+    maxSteps=50
+    wallCoordinates=np.array([[1, 1], [1, 3], [3, 1], [3, 3]])
+    forbiddenCoordinates=np.array([[2, 2]])
     forbiddenPenalty=-0.3
-    chanceOfSupervisor=0.95
+    chanceOfSupervisor=0.5
+    randomWalls=0
+    randomForbiddens=0
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5]])
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [4, 2], [4, 3], [4, 4]])
     # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]])
@@ -338,8 +346,8 @@ if __name__ == "__main__":
     lr=0.0001
     gamma=0.99
     epsilon_start=0.9
-    epsilon_min=0.00
-    epsilon_decay=2_000
+    epsilon_min=0.05
+    epsilon_decay=7000
     tau=0.005
 
     if useWandb:
@@ -359,7 +367,7 @@ if __name__ == "__main__":
     else:
         wandb = None
 
-    env = DQNGridWorldEnv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor)
+    env = DQNGridWorldEnv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
     observation, info = env.reset()
     agent = DQNAgent(env.action_space, observation,
         batch_size=batch_size,
@@ -374,6 +382,7 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation: {observation}")
     agent.train(env=env, num_episodes=num_episodes)
-    agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
-    show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor)
-    agent.inference(env=show_env, num_episodes=50)
+    if preName is not None:
+        agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
+    show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
+    agent.inference(env=show_env, num_episodes=50, epsilon=epsilon_min)

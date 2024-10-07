@@ -15,7 +15,8 @@ if __name__ == "__main__":
     stepLoss=-0.01
     maxSteps=20
     wallCoordinates = None
-    wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]])
+    #wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]])
+    forbiddenCoordinates=None
     forbiddenCoordinates=np.array([[3, 3], [4, 4]])
     forbiddenPenalty=-0.3
     chanceOfSupervisor=0.5

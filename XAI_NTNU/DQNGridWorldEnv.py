@@ -16,7 +16,7 @@ class DQNGridWorldEnv(gym.Env):
     
     """
 
-    def __init__(self, render_mode=None, size=6, agentSpawn = None, targetSpawn = None, q_values=None, goalReward=1, stepLoss=-0.01, maxSteps=100, wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]]), forbiddenCoordinates=np.array([[3, 4], [4, 3]]), forbiddenPenalty=-1, chanceOfSupervisor=0.5):
+    def __init__(self, render_mode=None, size=6, agentSpawn = None, targetSpawn = None, q_values=None, goalReward=1, stepLoss=-0.01, maxSteps=100, wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]]), forbiddenCoordinates=np.array([[3, 4], [4, 3]]), forbiddenPenalty=-1, chanceOfSupervisor=0.5, randomWalls=None, randomForbiddens=None):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.targetSpawn = targetSpawn
@@ -28,12 +28,15 @@ class DQNGridWorldEnv(gym.Env):
         self.maxSteps = maxSteps
         self.steps = 0
         # np array of wall coordinates with 0,1 and 1,1 as default
-        self.wallCoordinates = wallCoordinates
-        self.forbiddenCoordinates = forbiddenCoordinates
+        self.initWallCoordinates = np.empty((0, 2), dtype=int) if wallCoordinates is None else wallCoordinates 
+        self.initForbiddenCoordinates = np.empty((0, 2), dtype=int) if forbiddenCoordinates is None else forbiddenCoordinates
         self.forbiddenPenalty = forbiddenPenalty
         self.chanceOfSupervisor = chanceOfSupervisor
         self.isSupervisorPresent = 0
-
+        self.randomWalls = randomWalls
+        self.randomForbiddens = randomForbiddens
+        self.wallCoordinates = self.initWallCoordinates.copy()
+        self.forbiddenCoordinates = self.initForbiddenCoordinates.copy()
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
         self.observation_space = spaces.Box(
@@ -102,6 +105,23 @@ class DQNGridWorldEnv(gym.Env):
         super().reset(seed=seed)
         
         self.steps = 0
+        self.wallCoordinates = self.initWallCoordinates.copy()
+        self.forbiddenCoordinates = self.initForbiddenCoordinates.copy()
+
+        if self.randomWalls is not None:
+            for i in range(self.randomWalls):
+                newRandWall = self.np_random.integers(0, self.size, size=2, dtype=int)
+                while np.any([np.array_equal(newRandWall, wall) for wall in self.wallCoordinates]):
+                    newRandWall = self.np_random.integers(0, self.size, size=2, dtype=int)
+                self.wallCoordinates = np.append(self.wallCoordinates, [newRandWall], axis=0)
+        
+        if self.randomForbiddens is not None:
+            for i in range(self.randomForbiddens):
+                newRandForbidden = self.np_random.integers(0, self.size, size=2, dtype=int)
+                while np.any([np.array_equal(newRandForbidden, forbidden) for forbidden in self.forbiddenCoordinates]) or np.any([np.array_equal(newRandForbidden, wall) for wall in self.wallCoordinates]):
+                    newRandForbidden = self.np_random.integers(0, self.size, size=2, dtype=int)
+                self.forbiddenCoordinates = np.append(self.forbiddenCoordinates, [newRandForbidden], axis=0)
+
         if self.agentSpawn is None:
             # Choose the locations uniformly random until they don't coincide with eachother or walls
             self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
@@ -116,7 +136,7 @@ class DQNGridWorldEnv(gym.Env):
             while np.array_equal(self._target_location, self._agent_location):
                 self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
             if self.wallCoordinates is not None:
-                while np.any([np.array_equal(self._target_location, wall) for wall in self.wallCoordinates]) or np.array_equal(self._target_location, self._agent_location):
+                while np.any([np.array_equal(self._target_location, wall) for wall in self.wallCoordinates]) or np.array_equal(self._target_location, self._agent_location) or np.any([np.array_equal(self._target_location, forbidden) for forbidden in self.forbiddenCoordinates]):
                     self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
         else:
             self._target_location = self.targetSpawn
@@ -132,10 +152,10 @@ class DQNGridWorldEnv(gym.Env):
     def step(self, action):
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         direction = self._action_to_direction[action]
-        if self.wallCoordinates is not None:
-            # Check if the agent is trying to walk into a wall
-            if np.any([np.array_equal(self._agent_location + direction, wall) for wall in self.wallCoordinates]):
-                direction = np.array([0, 0])
+
+        # Check if the agent is trying to walk into a wall
+        if np.any([np.array_equal(self._agent_location + direction, wall) for wall in self.wallCoordinates]):
+            direction = np.array([0, 0])
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
