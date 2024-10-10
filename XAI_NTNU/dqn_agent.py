@@ -105,14 +105,14 @@ class DQNAgent():
         if show_result:
             plt.title('Result')
         else:
-            plt.clf() # This clears the figure
+            plt.clf() # Clear the figure
             plt.title('Training...')
         plt.xlabel('Episode')
         plt.ylabel('Episode Reward')
         plt.plot(rewards_t.numpy())
         plt.plot(epsilons_t.numpy())
         plt.plot(loss_t.numpy())
-        # Take 100 episode averages and plot them too
+        # Plot 100 episode averages
         if len(rewards_t) >= 100:
             means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
             means = torch.cat((torch.zeros(99), means))
@@ -120,10 +120,9 @@ class DQNAgent():
         
         plt.pause(0.001)  # pause a bit so that plots are updated
         if not show_result:
-            # display.display(plt.gcf())
             display.clear_output(wait=True)
         else:
-            display.display(plt.gcf()) # Comment out to stop printing?
+            display.display(plt.gcf())
 
     def optimize_model(self):
         # The model doesn't start training before having sufficient data
@@ -188,6 +187,7 @@ class DQNAgent():
         # Loop through episodes
         timeStart = time.time()
         for i_episode in range(num_episodes):
+            # 10% time estimate
             if i_episode == num_episodes // 10:
                 elapsed_time = time.time() - timeStart
                 finish_time = time.time() + elapsed_time * 9
@@ -199,6 +199,7 @@ class DQNAgent():
                 finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
                 
                 print(f"10%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it may finish around: {finish_time_readable}")
+            # 50% time estimate
             if i_episode == num_episodes // 2:
                 elapsed_time = time.time() - timeStart
                 finish_time = time.time() + elapsed_time
@@ -210,8 +211,7 @@ class DQNAgent():
                 finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
                 
                 print(f"50%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it may finish around: {finish_time_readable}")
-            #if i_episode == num_episodes//10:
-            #    print(f"Time elapsed: {time.time()-timeStart}, it will finish around: {time.time()+(time.time()-timeStart)*9}")
+            
             # Init env and git its state
             state, info = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -231,8 +231,6 @@ class DQNAgent():
 
                 # Store the transition in memory
                 self.memory.push(state, action, next_state, reward)
-
-                # print(f"Episode: {i_episode}, Step: {i}, episode reward: {episode_reward}, truncated: {truncated}, terminated: {terminated}")
 
                 # Move to the next state
                 state = next_state
@@ -275,7 +273,7 @@ class DQNAgent():
         print(f"Model loaded: {path}")
 
     def inference(self, env, num_episodes=200, epsilon=0.05):
-        for i_episode in range(num_episodes):
+        for _ in range(num_episodes):
             state, info = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             episode_reward = 0
@@ -314,14 +312,23 @@ class DQNAgent():
         #self.plot_rewards(show_result=True)
         #plt.ioff()
         #plt.show()
+    
+    def get_q_values(self, env, observation):
+        
+        observation = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+        print(f"action nr: {self.policy_network(observation).max(1)[1].view(1, 1)}")
+        print(f"Q values: {self.policy_network(observation)}")
+        print(f"Max Q value: {self.policy_network(observation).max().item()}")
+
+        return self.policy_network(observation).max(1)[1].view(1, 1)
 
 # main
 if __name__ == "__main__":
 
-    preName = "X-absSup_50perc_"
+    preName = "X-absSup_20perc_"
 
     # Config
-    num_episodes = 10_000
+    num_episodes = 30_000
 
     # DQNGridWorldEnv
     size=5
@@ -332,13 +339,10 @@ if __name__ == "__main__":
     maxSteps=50
     wallCoordinates=np.array([[1, 1], [1, 3], [3, 1], [3, 3]])
     forbiddenCoordinates=np.array([[2, 2]])
-    forbiddenPenalty=-0.3
-    chanceOfSupervisor=0.5
+    forbiddenPenalty=-0.5
+    chanceOfSupervisor=0.2
     randomWalls=0
     randomForbiddens=0
-    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 4], [3, 4], [4, 2], [4, 3], [4, 4], [5, 5]])
-    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [4, 2], [4, 3], [4, 4]])
-    # wallCoordinates=np.array([[1, 1], [1, 2], [1, 3], [2, 3], [3, 3]])
 
     # Agent
     useWandb = False
@@ -347,7 +351,7 @@ if __name__ == "__main__":
     gamma=0.99
     epsilon_start=0.9
     epsilon_min=0.05
-    epsilon_decay=7000
+    epsilon_decay=20_000
     tau=0.005
 
     if useWandb:
@@ -382,6 +386,7 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation: {observation}")
     agent.train(env=env, num_episodes=num_episodes)
+    chanceOfSupervisor = 0.5
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
     show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
