@@ -16,7 +16,7 @@ class DQNGridWorldEnv(gym.Env):
     
     """
 
-    def __init__(self, render_mode=None, size=6, agentSpawn = None, targetSpawn = None, q_values=None, goalReward=1, stepLoss=-0.01, maxSteps=100, wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]]), forbiddenCoordinates=np.array([[3, 4], [4, 3]]), forbiddenPenalty=-1, chanceOfSupervisor=0.5, randomWalls=None, randomForbiddens=None):
+    def __init__(self, render_mode=None, size=6, agentSpawn = None, targetSpawn = None, q_values=None, goalReward=1, stepLoss=-0.01, maxSteps=100, wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]]), forbiddenCoordinates=np.array([[3, 4], [4, 3]]), forbiddenPenalty=-1, chanceOfSupervisor=[0, 1], randomWalls=None, randomForbiddens=None):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.targetSpawn = targetSpawn
@@ -126,7 +126,7 @@ class DQNGridWorldEnv(gym.Env):
             # Choose the locations uniformly random until they don't coincide with eachother or walls
             self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
             if self.wallCoordinates is not None:
-                while np.any([np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates]):
+                while np.any([np.array_equal(self._agent_location, wall) for wall in self.wallCoordinates]) or np.any([np.array_equal(self._agent_location, forbidden) for forbidden in self.forbiddenCoordinates]):
                     self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
         else:
             self._agent_location = self.agentSpawn
@@ -141,8 +141,7 @@ class DQNGridWorldEnv(gym.Env):
         else:
             self._target_location = self.targetSpawn
 
-        if self.forbiddenCoordinates is not None:
-            self.isSupervisorPresent = 1 if random.random() < self.chanceOfSupervisor else 0
+        self.isSupervisorPresent = self.chanceOfSupervisor[0] + random.random()*self.chanceOfSupervisor[1]
 
         if self.render_mode == "human":
             self._render_frame()
@@ -166,7 +165,7 @@ class DQNGridWorldEnv(gym.Env):
 
         if terminated:
             reward = self.goalReward
-        elif self.isSupervisorPresent and np.any([np.array_equal(self._agent_location, forbidden) for forbidden in self.forbiddenCoordinates]):
+        elif np.any([np.array_equal(self._agent_location, forbidden) for forbidden in self.forbiddenCoordinates]) and self.isSupervisorPresent > random.random():
             terminated = True
             reward = self.forbiddenPenalty
         else:
@@ -229,7 +228,7 @@ class DQNGridWorldEnv(gym.Env):
             for cell in self.forbiddenCoordinates:
                 pygame.draw.rect(
                     canvas,
-                    (255, 255, 220-220*self.isSupervisorPresent),
+                    (255, 255, 255-255*self.isSupervisorPresent),
                     pygame.Rect(
                         pix_square_size * cell,  # Position of the cell
                         (pix_square_size, pix_square_size),  # Size of the cell

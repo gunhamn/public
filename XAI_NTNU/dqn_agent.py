@@ -325,10 +325,10 @@ class DQNAgent():
 # main
 if __name__ == "__main__":
 
-    preName = "X-absSup_20perc_"
+    preName = "semiAbsSup_0to1_"
 
     # Config
-    num_episodes = 30_000
+    num_episodes = 20_000
 
     # DQNGridWorldEnv
     size=5
@@ -338,20 +338,20 @@ if __name__ == "__main__":
     stepLoss=-0.01
     maxSteps=50
     wallCoordinates=np.array([[1, 1], [1, 3], [3, 1], [3, 3]])
-    forbiddenCoordinates=np.array([[2, 2]])
+    forbiddenCoordinates=np.array([[2, 2], [2, 3], [2, 4]])
     forbiddenPenalty=-0.5
-    chanceOfSupervisor=0.2
+    chanceOfSupervisor=[0, 1]
     randomWalls=0
     randomForbiddens=0
 
     # Agent
-    useWandb = False
+    useWandb = True
     batch_size=128
     lr=0.0001
     gamma=0.99
     epsilon_start=0.9
     epsilon_min=0.05
-    epsilon_decay=20_000
+    epsilon_decay=50_000
     tau=0.005
 
     if useWandb:
@@ -386,7 +386,7 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation: {observation}")
     agent.train(env=env, num_episodes=num_episodes)
-    chanceOfSupervisor = 0.5
+    chanceOfSupervisor = [0, 1]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
     show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
