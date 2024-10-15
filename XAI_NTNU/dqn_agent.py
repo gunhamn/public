@@ -238,6 +238,8 @@ class DQNAgent():
                 # Perform one step of the optimization
                 self.optimize_model()
 
+                # Todo: change to updated every 2000 steps
+
                 # Soft update the target network's weights
                 target_net_state_dict = self.target_network.state_dict()
                 policy_net_state_dict = self.policy_network.state_dict()
@@ -352,7 +354,7 @@ if __name__ == "__main__":
     epsilon_start=0.9
     epsilon_min=0.05
     epsilon_decay=50_000
-    tau=0.005
+    tau=0.005 # CHANGE TO 1.20 (kidding, 1.0)
 
     if useWandb:
         wandb.init(project=f"{preName}{size}x{size}_{num_episodes}episodes",

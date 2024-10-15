@@ -24,9 +24,9 @@ if __name__ == "__main__":
     stepLoss=-0.01
     maxSteps=50
     wallCoordinates=np.array([[1, 1], [1, 3], [3, 1], [3, 3]])
-    forbiddenCoordinates=np.array([[2, 2]])
+    forbiddenCoordinates=np.array([[2, 2], [2, 3], [2, 4]])
     forbiddenPenalty=-0.5
-    chanceOfSupervisor=0.5
+    chanceOfSupervisor=[0, 1]
     randomWalls=0
     randomForbiddens=0
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         tau=tau,
         wandb=None)
     
-    agent.load_model_weights("C:/Projects/public/XAI_NTNU/models/X-absSup_20perc_5x5_30000ep.pth")
+    agent.load_model_weights("C:/Projects/public/XAI_NTNU/models/semiAbsSup_0to1_5x5_20000ep.pth")
     print(f"Observation: {observation}")
     agent.inference(env, num_episodes)
     #observation, _ = env.reset()
