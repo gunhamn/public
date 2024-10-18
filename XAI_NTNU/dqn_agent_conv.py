@@ -16,7 +16,7 @@ from datetime import datetime
 import wandb
 
 
-from DQNGridWorldEnv import DQNGridWorldEnv
+from DQNGridWorldEnvConv import DQNGridWorldEnvConv
 
 #env = DQNGridWorldEnv(render_mode=None, size=4, goalReward=100, stepLoss=-1)
 
@@ -26,11 +26,10 @@ from DQNGridWorldEnv import DQNGridWorldEnv
 #    from IPython import display
 # plt.ion()
 
-class neural_network(torch.nn.Module):
+"""class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
         super(neural_network, self).__init__()
         self.layer1 = torch.nn.Linear(observation_space_n, 128)
-        self.layer2 = torch.nn.Linear(128, 128)
         self.layer2 = torch.nn.Linear(128, 128)
         self.layer3 = torch.nn.Linear(128, action_space_n)
 
@@ -38,7 +37,34 @@ class neural_network(torch.nn.Module):
         x = torch.nn.Flatten()(x)
         x = torch.nn.functional.relu(self.layer1(x))
         x = torch.nn.functional.relu(self.layer2(x))
-        return self.layer3(x)
+        return self.layer3(x)"""
+
+class neural_network(torch.nn.Module):
+    def __init__(self, observation_space_n, action_space_n):
+        super(neural_network, self).__init__()
+        # observation_shape: (channels, height, width)
+        channels = 1
+        
+        # Define the convolutional layers
+        self.conv1 = nn.Conv2d(channels, 32, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        
+        self.flattened_size = 64 * 8 * 8  # Assuming input size is (1, 8, 8)
+        
+        # Define the fully connected layers
+        self.fc1 = nn.Linear(self.flattened_size, 128)
+        self.fc2 = nn.Linear(128, action_space_n)
+
+    def forward(self, x):
+        # Ensure the input has the correct shape [batch_size, channels, height, width]
+        #x = x.unsqueeze(1)  # Add channel dimension
+
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x, 1)
+        x = F.relu(self.fc1(x))
+        return self.fc2(x)
+
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
@@ -56,8 +82,8 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
-class DQNAgent():
-    def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.005, replayBuffer=100_000, wandb=None):
+class DQNAgentConv():
+    def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.005, replayBuffer=10_000, wandb=None):
         self.action_space = action_space
         self.observation = observation
         self.batch_size = batch_size
@@ -175,11 +201,11 @@ class DQNAgent():
         # Compute Huber loss
         criterion = nn.SmoothL1Loss()
         self.loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-        # Unsqueezing is used to add an extra dimension to the tensor
         
         # Optimize the model
         self.optimizer.zero_grad()
         self.loss.backward()
+
         # In-place gradient clipping
         torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
         self.optimizer.step()
@@ -215,7 +241,7 @@ class DQNAgent():
             
             # Init env and git its state
             state, info = env.reset()
-            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(1)
             episode_reward = 0
             for i in count(): # Loop through steps
                 action = self.get_action(state)
@@ -228,7 +254,7 @@ class DQNAgent():
                     next_state = None
                 else:
                     next_state = torch.tensor(observation, dtype=torch.float32,
-                        device=self.device).unsqueeze(0)
+                        device=self.device).unsqueeze(0).unsqueeze(1)
 
                 # Store the transition in memory
                 self.memory.push(state, action, next_state, reward)
@@ -239,7 +265,7 @@ class DQNAgent():
                 # Perform one step of the optimization
                 self.optimize_model()
 
-                # Todo: update the whole network every 30th episode
+                # Todo: change to updated around every 2000 steps
                 if i_episode % 30 == 0:
                     self.target_network.load_state_dict(self.policy_network.state_dict())
 
@@ -280,7 +306,7 @@ class DQNAgent():
     def inference(self, env, num_episodes=200, epsilon=0.05):
         for _ in range(num_episodes):
             state, info = env.reset()
-            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(1)
             episode_reward = 0
             for i in count():
                 # Select action with as set epsilon
@@ -300,7 +326,7 @@ class DQNAgent():
                     next_state = None
                 else:
                     next_state = torch.tensor(observation, dtype=torch.float32,
-                        device=self.device).unsqueeze(0)
+                        device=self.device).unsqueeze(0).unsqueeze(1)
 
                 state = next_state
 
@@ -321,15 +347,19 @@ class DQNAgent():
     def get_q_values(self, env, observation):
         
         observation = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+        print(f"action nr: {self.policy_network(observation).max(1)[1].view(1, 1)}")
+        print(f"Q values: {self.policy_network(observation)}")
+        print(f"Max Q value: {self.policy_network(observation).max().item()}")
+
         return self.policy_network(observation).max(1)[1].view(1, 1)
 
 # main
 if __name__ == "__main__":
 
-    preName = "semiAbsSup_0to1_"
+    preName = "ConvNoAbs_" #ConvAbsSup_05to05_"
 
     # Config
-    num_episodes = 5_000
+    num_episodes = 5000
 
     # DQNGridWorldEnv
     size=8
@@ -353,7 +383,7 @@ if __name__ == "__main__":
     epsilon_start=1
     epsilon_min=0.01
     epsilon_decay=75_000
-    tau=0.0005 # CHANGE TO 1.20 (kidding, 1.0)
+    tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
     if useWandb:
@@ -373,9 +403,9 @@ if __name__ == "__main__":
     else:
         wandb = None
 
-    env = DQNGridWorldEnv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
+    env = DQNGridWorldEnvConv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
     observation, info = env.reset()
-    agent = DQNAgent(env.action_space, observation,
+    agent = DQNAgentConv(env.action_space, observation,
         batch_size=batch_size,
         lr=lr,
         gamma=gamma,
@@ -388,9 +418,10 @@ if __name__ == "__main__":
     
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation: {observation}")
+    print(f"First observation.shape: {observation.shape}")
     agent.train(env=env, num_episodes=num_episodes)
     chanceOfSupervisor = [0.5, 0.5]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
-    show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
+    show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
     agent.inference(env=show_env, num_episodes=50, epsilon=epsilon_min)
