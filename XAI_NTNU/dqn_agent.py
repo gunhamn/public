@@ -240,7 +240,7 @@ class DQNAgent():
                 self.optimize_model()
 
                 # Todo: update the whole network every 30th episode
-                if i_episode % 30 == 0:
+                if i_episode % 15 == 0:
                     self.target_network.load_state_dict(self.policy_network.state_dict())
 
                 """# Soft update the target network's weights
@@ -341,7 +341,7 @@ if __name__ == "__main__":
     wallCoordinates=np.array([[0, 0], [0, 1], [1, 0]])
     forbiddenCoordinates=None
     forbiddenPenalty=-0.3
-    chanceOfSupervisor=[0.5, 0.5]
+    chanceOfSupervisor=[0.0, 0.2]
     randomWalls=3
     randomForbiddens=0
 
@@ -351,7 +351,7 @@ if __name__ == "__main__":
     lr=0.001
     gamma=0.95
     epsilon_start=1
-    epsilon_min=0.01
+    epsilon_min=0.05
     epsilon_decay=75_000
     tau=0.0005 # CHANGE TO 1.20 (kidding, 1.0)
     replayBuffer=100_000
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation: {observation}")
     agent.train(env=env, num_episodes=num_episodes)
-    chanceOfSupervisor = [0.5, 0.5]
+    chanceOfSupervisor = [0.0, 0.2]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
     show_env = DQNGridWorldEnv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)

@@ -266,7 +266,7 @@ class DQNAgentConv():
                 self.optimize_model()
 
                 # Todo: change to updated around every 2000 steps
-                if i_episode % 30 == 0:
+                if i_episode % 15 == 0:
                     self.target_network.load_state_dict(self.policy_network.state_dict())
 
                 """# Soft update the target network's weights
@@ -359,21 +359,21 @@ if __name__ == "__main__":
     preName = "ConvNoAbs_" #ConvAbsSup_05to05_"
 
     # Config
-    num_episodes = 5000
+    num_episodes = 10_000
 
     # DQNGridWorldEnv
     size=8
     agentSpawn=None
     targetSpawn=None
     goalReward=1
-    stepLoss=-0.01
-    maxSteps=70
+    stepLoss=-0.003
+    maxSteps=200
     wallCoordinates=np.array([[0, 0], [0, 1], [1, 0]])
     forbiddenCoordinates=None
-    forbiddenPenalty=-0.3
-    chanceOfSupervisor=[0.5, 0.5]
+    forbiddenPenalty=-0.4
+    chanceOfSupervisor=[0.0, 0.2]
     randomWalls=3
-    randomForbiddens=0
+    randomForbiddens=1
 
     # Agent
     useWandb = False
@@ -381,8 +381,8 @@ if __name__ == "__main__":
     lr=0.001
     gamma=0.95
     epsilon_start=1
-    epsilon_min=0.01
-    epsilon_decay=75_000
+    epsilon_min=0.05
+    epsilon_decay=150_000
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
@@ -420,7 +420,7 @@ if __name__ == "__main__":
     print(f"First observation: {observation}")
     print(f"First observation.shape: {observation.shape}")
     agent.train(env=env, num_episodes=num_episodes)
-    chanceOfSupervisor = [0.5, 0.5]
+    chanceOfSupervisor=[0.0, 0.2]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
     show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)

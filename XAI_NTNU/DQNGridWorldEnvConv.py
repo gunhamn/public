@@ -141,6 +141,7 @@ class DQNGridWorldEnvConv(gym.Env):
             self._target_location = self.targetSpawn
 
         self.isSupervisorPresent = self.chanceOfSupervisor[0] + random.random()*(self.chanceOfSupervisor[1]-self.chanceOfSupervisor[0])
+        self.isSupervisorPresent = round(self.isSupervisorPresent, 1)
 
         if self.render_mode == "human":
             self._render_frame()
