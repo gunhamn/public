@@ -72,7 +72,7 @@ class DQNGridWorldEnvConv(gym.Env):
         self.clock = None
 
     def _get_obs(self, agentLoc=None, targetLoc=None):
-        obs = np.full((self.size, self.size), 0, dtype=np.float16)
+        obs = np.full((self.size, self.size), -1, dtype=np.float16)
         if agentLoc is None:
             agentLoc = self._agent_location
         if targetLoc is None:
@@ -86,7 +86,7 @@ class DQNGridWorldEnvConv(gym.Env):
 
         if self.wallCoordinates is not None:
             for coordinate in self.wallCoordinates:
-                obs[coordinate[0], coordinate[1]] = -1
+                obs[coordinate[0], coordinate[1]] = 0
 
         # Flatten obs
         # obs = obs.reshape((self.size, self.size, 1))

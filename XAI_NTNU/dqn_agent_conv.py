@@ -42,14 +42,14 @@ from DQNGridWorldEnvConv import DQNGridWorldEnvConv
 class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
         super(neural_network, self).__init__()
-        # observation_shape: (channels, height, width)
         channels = 1
         
         # Define the convolutional layers
         self.conv1 = nn.Conv2d(channels, 32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         
-        self.flattened_size = 64 * 8 * 8  # Assuming input size is (1, 8, 8)
+        self.flattened_size = 32 * channels * observation_space_n  # Assuming input size is (channels, size, size)
         
         # Define the fully connected layers
         self.fc1 = nn.Linear(self.flattened_size, 128)
@@ -61,6 +61,7 @@ class neural_network(torch.nn.Module):
 
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
         return self.fc2(x)
@@ -108,6 +109,7 @@ class DQNAgentConv():
         self.memory = ReplayMemory(replayBuffer)
         self.steps_done = 0
         self.episode_rewards = []
+        self.rewardPerStep_history = []
         self.epsilon_history = []
         self.loss = 0.0
         self.loss_history = []
@@ -127,6 +129,7 @@ class DQNAgentConv():
     def plot_rewards(self, show_result=False):
         plt.figure(1)
         rewards_t = torch.tensor(self.episode_rewards, dtype=torch.float)
+        rewardPerStep_t = torch.tensor(self.rewardPerStep_history, dtype=torch.float)
         epsilons_t = torch.tensor(self.epsilon_history, dtype=torch.float)
         loss_t = torch.tensor(self.loss_history, dtype=torch.float)
         if show_result:
@@ -136,15 +139,20 @@ class DQNAgentConv():
             plt.title('Training...')
         plt.xlabel('Episode')
         plt.ylabel('Episode Reward')
-        plt.plot(rewards_t.numpy())
-        plt.plot(epsilons_t.numpy())
-        plt.plot(loss_t.numpy())
+        plt.plot(rewards_t.numpy(), label='Ep Reward')
+        plt.plot(epsilons_t.numpy(), label='Epsilon')
+        plt.plot(loss_t.numpy(), label='Loss')
         # Plot 100 episode averages
         if len(rewards_t) >= 100:
             means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
             means = torch.cat((torch.zeros(99), means))
-            plt.plot(means.numpy())
-        
+            plt.plot(means.numpy(), label='100-ep av reward')
+            rps_means = rewardPerStep_t.unfold(0, 100, 1).mean(1).view(-1)
+            rps_means = torch.cat((torch.zeros(99), rps_means))
+            plt.plot(rps_means.numpy(), label='100-ep av reward/steps')
+        #plt.plot(rewardPerStep_t.numpy(), label='Reward/steps')
+
+        plt.legend()
         plt.pause(0.001)  # pause a bit so that plots are updated
         if not show_result:
             display.clear_output(wait=True)
@@ -265,32 +273,36 @@ class DQNAgentConv():
                 # Perform one step of the optimization
                 self.optimize_model()
 
+                """
                 # Todo: change to updated around every 2000 steps
-                if i_episode % 15 == 0:
+                if i_episode % 30 == 0:
                     self.target_network.load_state_dict(self.policy_network.state_dict())
-
-                """# Soft update the target network's weights
+                """
+                
+                # Soft update the target network's weights
                 target_net_state_dict = self.target_network.state_dict()
                 policy_net_state_dict = self.policy_network.state_dict()
                 for key in policy_net_state_dict:
                     target_net_state_dict[key] = policy_net_state_dict[key] * self.tau + target_net_state_dict[key] * (1 - self.tau)
-                self.target_network.load_state_dict(target_net_state_dict)"""
+                self.target_network.load_state_dict(target_net_state_dict)
 
                 if done:
                     self.episode_rewards.append(episode_reward)
                     epsilon = self.epsilon_min + (self.epsilon_start - self.epsilon_min) * \
                         math.exp(-1. * self.steps_done / self.epsilon_decay)
+                    self.rewardPerStep_history.append(episode_reward / (i + 1))
                     self.epsilon_history.append(epsilon)
                     self.loss_history.append(self.loss)
                     if self.wandb:
                         self.wandb.log({"episode_reward": episode_reward,
                                     "epsilon": epsilon,
+                                    "rewardPerStep": episode_reward / (i + 1),
                                     "loss": self.loss})
                     self.plot_rewards()
                     break
             
         print("Complete")
-        self.plot_rewards(show_result=True)
+        self.plot_rewards()
         plt.ioff()
         plt.show()
 
@@ -333,9 +345,6 @@ class DQNAgentConv():
                 if done:
                     self.episode_rewards.append(episode_reward)
                     self.loss_history.append(self.loss)
-                    if self.wandb:
-                        self.wandb.log({"episode_reward": episode_reward,
-                                    "loss": self.loss})
                     #self.plot_rewards()
                     break
             
@@ -356,23 +365,23 @@ class DQNAgentConv():
 # main
 if __name__ == "__main__":
 
-    preName = "ConvNoAbs_" #ConvAbsSup_05to05_"
+    preName = "PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
-    num_episodes = 10_000
+    num_episodes = 3_000
 
     # DQNGridWorldEnv
     size=8
     agentSpawn=None
     targetSpawn=None
     goalReward=1
-    stepLoss=-0.003
+    stepLoss=-0.005
     maxSteps=200
     wallCoordinates=np.array([[0, 0], [0, 1], [1, 0]])
     forbiddenCoordinates=None
     forbiddenPenalty=-0.4
-    chanceOfSupervisor=[0.0, 0.2]
-    randomWalls=3
+    chanceOfSupervisor=[0.0, 1]
+    randomWalls=5
     randomForbiddens=1
 
     # Agent
@@ -382,12 +391,12 @@ if __name__ == "__main__":
     gamma=0.95
     epsilon_start=1
     epsilon_min=0.05
-    epsilon_decay=150_000
+    epsilon_decay=50_000 # 50_000 at 3000 episodes
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
     if useWandb:
-        wandb.init(project=f"{preName}{size}x{size}_{num_episodes}episodes",
+        wandb.init(project=f"{preName}_{size}x{size}_{num_episodes}episodes",
             config={
             "size": size,
             "goalReward": goalReward,
@@ -417,10 +426,11 @@ if __name__ == "__main__":
         wandb=wandb)
     
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
-    print(f"First observation: {observation}")
+    print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
+    agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/Conv2RandAbs3walls0to18x8_3000ep.pth")
     agent.train(env=env, num_episodes=num_episodes)
-    chanceOfSupervisor=[0.0, 0.2]
+    chanceOfSupervisor=[0.0, 1]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
     show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
