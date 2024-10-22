@@ -37,6 +37,11 @@ class DQNGridWorldEnvConv(gym.Env):
         self.randomForbiddens = randomForbiddens
         self.wallCoordinates = self.initWallCoordinates.copy()
         self.forbiddenCoordinates = self.initForbiddenCoordinates.copy()
+        self.wallColor = (0, 0, 0)
+        self.blankColor = (255, 255, 255)
+        self.agentColor = (0, 0, 255)
+        self.targetColor = (255, 0, 0)
+
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
         self.observation_space = spaces.Box(

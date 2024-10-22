@@ -365,7 +365,7 @@ class DQNAgentConv():
 # main
 if __name__ == "__main__":
 
-    preName = "PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
+    preName = None #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
     num_episodes = 3_000
@@ -382,7 +382,7 @@ if __name__ == "__main__":
     forbiddenPenalty=-0.4
     chanceOfSupervisor=[0.0, 1]
     randomWalls=5
-    randomForbiddens=1
+    randomForbiddens=0
 
     # Agent
     useWandb = False
@@ -429,7 +429,7 @@ if __name__ == "__main__":
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
     agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/Conv2RandAbs3walls0to18x8_3000ep.pth")
-    agent.train(env=env, num_episodes=num_episodes)
+    # agent.train(env=env, num_episodes=num_episodes)
     chanceOfSupervisor=[0.0, 1]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
