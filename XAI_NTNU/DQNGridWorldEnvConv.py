@@ -41,6 +41,7 @@ class DQNGridWorldEnvConv(gym.Env):
         self.blankColor = (255, 255, 255)
         self.agentColor = (0, 0, 255)
         self.targetColor = (255, 0, 0)
+        self.forbiddenColor = (255, 255, 0)
 
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
@@ -77,28 +78,28 @@ class DQNGridWorldEnvConv(gym.Env):
         self.clock = None
 
     def _get_obs(self, agentLoc=None, targetLoc=None):
-        obs = np.full((self.size, self.size), -1, dtype=np.float16)
+        obs = np.full((self.size, self.size, 3), 0, dtype=np.float16)
         if agentLoc is None:
             agentLoc = self._agent_location
         if targetLoc is None:
             targetLoc = self._target_location
-        obs[agentLoc[0], agentLoc[1]] = 1  # 1 for agent
-        obs[targetLoc[0], targetLoc[1]] = 2  # 2 for target
+        obs[agentLoc[0], agentLoc[1]] = self.agentColor
+        obs[targetLoc[0], targetLoc[1]] = self.targetColor
 
         if self.forbiddenCoordinates is not None:
             for coordinate in self.forbiddenCoordinates:
-                obs[coordinate[0], coordinate[1]] = -2
+                obs[coordinate[0], coordinate[1]] = self.forbiddenColor
 
         if self.wallCoordinates is not None:
             for coordinate in self.wallCoordinates:
-                obs[coordinate[0], coordinate[1]] = 0
+                obs[coordinate[0], coordinate[1]] = self.wallColor
 
         # Flatten obs
         # obs = obs.reshape((self.size, self.size, 1))
         # Add manhattan distance to obs
         # obs = np.append(obs, np.linalg.norm(self._agent_location - self._target_location, ord=1))
-        if self.forbiddenCoordinates is not None:
-            obs[0, 0] = self.isSupervisorPresent
+        #if self.forbiddenCoordinates is not None:
+        #    obs[0, 0] = self.forbiddenColor # not in use
         return obs
     
     def _get_info(self):

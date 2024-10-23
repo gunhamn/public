@@ -42,15 +42,16 @@ from DQNGridWorldEnvConv import DQNGridWorldEnvConv
 class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
         super(neural_network, self).__init__()
-        channels = 1
+        size = 10
+        channels = 3
         
         # Define the convolutional layers
-        self.conv1 = nn.Conv2d(channels, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(size, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         
-        self.flattened_size = 32 * channels * observation_space_n  # Assuming input size is (channels, size, size)
-        
+        self.flattened_size = 32 * size * channels  # Assuming input size is (channels, size, size) eller???
+        # (64x768 and 49152x128)
         # Define the fully connected layers
         self.fc1 = nn.Linear(self.flattened_size, 128)
         self.fc2 = nn.Linear(128, action_space_n)
@@ -58,7 +59,6 @@ class neural_network(torch.nn.Module):
     def forward(self, x):
         # Ensure the input has the correct shape [batch_size, channels, height, width]
         #x = x.unsqueeze(1)  # Add channel dimension
-
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
@@ -249,7 +249,7 @@ class DQNAgentConv():
             
             # Init env and git its state
             state, info = env.reset()
-            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(1)
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0) #.unsqueeze(1)
             episode_reward = 0
             for i in count(): # Loop through steps
                 action = self.get_action(state)
@@ -262,7 +262,7 @@ class DQNAgentConv():
                     next_state = None
                 else:
                     next_state = torch.tensor(observation, dtype=torch.float32,
-                        device=self.device).unsqueeze(0).unsqueeze(1)
+                        device=self.device).unsqueeze(0) #.unsqueeze(1)
 
                 # Store the transition in memory
                 self.memory.push(state, action, next_state, reward)
@@ -318,7 +318,7 @@ class DQNAgentConv():
     def inference(self, env, num_episodes=200, epsilon=0.05):
         for _ in range(num_episodes):
             state, info = env.reset()
-            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(1)
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0) #.unsqueeze(1)
             episode_reward = 0
             for i in count():
                 # Select action with as set epsilon
@@ -338,7 +338,7 @@ class DQNAgentConv():
                     next_state = None
                 else:
                     next_state = torch.tensor(observation, dtype=torch.float32,
-                        device=self.device).unsqueeze(0).unsqueeze(1)
+                        device=self.device).unsqueeze(0) #.unsqueeze(1)
 
                 state = next_state
 
@@ -368,20 +368,20 @@ if __name__ == "__main__":
     preName = None #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
-    num_episodes = 3_000
+    num_episodes = 12000
 
     # DQNGridWorldEnv
-    size=8
+    size=10
     agentSpawn=None
     targetSpawn=None
     goalReward=1
     stepLoss=-0.005
     maxSteps=200
-    wallCoordinates=np.array([[0, 0], [0, 1], [1, 0]])
+    wallCoordinates=None
     forbiddenCoordinates=None
     forbiddenPenalty=-0.4
     chanceOfSupervisor=[0.0, 1]
-    randomWalls=5
+    randomWalls=10
     randomForbiddens=0
 
     # Agent
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     gamma=0.95
     epsilon_start=1
     epsilon_min=0.05
-    epsilon_decay=50_000 # 50_000 at 3000 episodes
+    epsilon_decay=200_000 # 50_000 at 3000 episodes
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
@@ -428,8 +428,8 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
-    agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/Conv2RandAbs3walls0to18x8_3000ep.pth")
-    # agent.train(env=env, num_episodes=num_episodes)
+    # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/Conv2RandAbs3walls0to18x8_3000ep.pth")
+    agent.train(env=env, num_episodes=num_episodes)
     chanceOfSupervisor=[0.0, 1]
     if preName is not None:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
