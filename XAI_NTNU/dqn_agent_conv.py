@@ -42,8 +42,9 @@ from DQNGridWorldEnvConv import DQNGridWorldEnvConv
 class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
         super(neural_network, self).__init__()
-        size = 10
+ 
         channels = 3
+        size = int(math.sqrt(observation_space_n / channels)) # size 8 makes observation_space_n 8x8x3=192
         
         # Define the convolutional layers
         self.conv1 = nn.Conv2d(size, 32, kernel_size=3, stride=1, padding=1)
@@ -214,14 +215,26 @@ class DQNAgentConv():
         self.optimizer.zero_grad()
         self.loss.backward()
 
-        # In-place gradient clipping
-        torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
+        # In-place gradient clipping (todo: maybe remove this)
+        #torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
         self.optimizer.step()
 
     def train(self, env, num_episodes=200):
         # Loop through episodes
         timeStart = time.time()
         for i_episode in range(num_episodes):
+            if i_episode == num_episodes // 100:
+                elapsed_time = time.time() - timeStart
+                finish_time = time.time() + elapsed_time * 99
+                
+                # Convert elapsed time to minutes and seconds
+                minutes, seconds = divmod(elapsed_time, 60)
+                
+                # Convert finish time to a readable time of day
+                finish_time_readable = datetime.fromtimestamp(finish_time).strftime('%Y-%m-%d %H:%M:%S')
+                
+                print(f"1%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it may finish around: {finish_time_readable}")
+            
             # 10% time estimate
             if i_episode == num_episodes // 10:
                 elapsed_time = time.time() - timeStart
@@ -274,7 +287,7 @@ class DQNAgentConv():
                 self.optimize_model()
 
                 """
-                # Todo: change to updated around every 2000 steps
+                # Maybe change to updated around every 2000 steps instead of soft update
                 if i_episode % 30 == 0:
                     self.target_network.load_state_dict(self.policy_network.state_dict())
                 """
@@ -365,24 +378,30 @@ class DQNAgentConv():
 # main
 if __name__ == "__main__":
 
-    preName = None #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
+    preName = "2goodCoins0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
-    num_episodes = 12000
+    num_episodes = 6000
 
     # DQNGridWorldEnv
-    size=10
+    size=8
     agentSpawn=None
     targetSpawn=None
     goalReward=1
-    stepLoss=-0.005
-    maxSteps=200
+    stepLoss=-0.01
+    maxSteps=100
     wallCoordinates=None
     forbiddenCoordinates=None
     forbiddenPenalty=-0.4
     chanceOfSupervisor=[0.0, 1]
-    randomWalls=10
+    randomWalls=0
     randomForbiddens=0
+    goodCoinCoordinates=None
+    badCoinCoordinates=None
+    goodCoinReward=0.1
+    badCoinPenalty=-0.1
+    randomGoodCoins=2
+    randomBadCoins=0
 
     # Agent
     useWandb = False
@@ -391,7 +410,7 @@ if __name__ == "__main__":
     gamma=0.95
     epsilon_start=1
     epsilon_min=0.05
-    epsilon_decay=200_000 # 50_000 at 3000 episodes
+    epsilon_decay=100_000 # 50_000 at 3000 episodes
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
@@ -412,7 +431,7 @@ if __name__ == "__main__":
     else:
         wandb = None
 
-    env = DQNGridWorldEnvConv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
+    env = DQNGridWorldEnvConv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens, goodCoinCoordinates=goodCoinCoordinates, badCoinCoordinates=badCoinCoordinates, goodCoinReward=goodCoinReward, badCoinPenalty=badCoinPenalty, randomGoodCoins=randomGoodCoins, randomBadCoins=randomBadCoins)
     observation, info = env.reset()
     agent = DQNAgentConv(env.action_space, observation,
         batch_size=batch_size,
@@ -424,14 +443,21 @@ if __name__ == "__main__":
         tau=tau,
         replayBuffer=replayBuffer,
         wandb=wandb)
+
+    # Todo:
+    # - normalize
+    # - plot everything (plot gradients, should be normal dist around 0)
+    # - remove clipping, check!
+    # - maybe check gradients
+
     
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
-    # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/Conv2RandAbs3walls0to18x8_3000ep.pth")
+    # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
     agent.train(env=env, num_episodes=num_episodes)
-    chanceOfSupervisor=[0.0, 1]
+    # chanceOfSupervisor=[0.0, 1]
     if preName is not None:
-        agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}{size}x{size}_{num_episodes}ep.pth")
-    show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=15, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens)
+        agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}_{size}x{size}_{num_episodes}ep.pth")
+    show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=20, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens, goodCoinCoordinates=goodCoinCoordinates, badCoinCoordinates=badCoinCoordinates, goodCoinReward=goodCoinReward, badCoinPenalty=badCoinPenalty, randomGoodCoins=randomGoodCoins, randomBadCoins=randomBadCoins)
     agent.inference(env=show_env, num_episodes=50, epsilon=epsilon_min)

@@ -16,7 +16,7 @@ class DQNGridWorldEnvConv(gym.Env):
     
     """
 
-    def __init__(self, render_mode=None, size=6, agentSpawn = None, targetSpawn = None, q_values=None, goalReward=1, stepLoss=-0.01, maxSteps=100, wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]]), forbiddenCoordinates=np.array([[3, 4], [4, 3]]), forbiddenPenalty=-1, chanceOfSupervisor=[0, 1], randomWalls=None, randomForbiddens=None):
+    def __init__(self, render_mode=None, size=6, agentSpawn = None, targetSpawn = None, q_values=None, goalReward=1, stepLoss=-0.01, maxSteps=100, wallCoordinates=np.array([[1, 4],[2, 4], [4, 2], [4, 1]]), forbiddenCoordinates=np.array([[3, 4], [4, 3]]), forbiddenPenalty=-1, chanceOfSupervisor=[0, 1], randomWalls=None, randomForbiddens=None, goodCoinCoordinates=None, badCoinCoordinates=None, goodCoinReward=0.1, badCoinPenalty=-0.1, randomGoodCoins=None, randomBadCoins=None):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.targetSpawn = targetSpawn
@@ -37,12 +37,20 @@ class DQNGridWorldEnvConv(gym.Env):
         self.randomForbiddens = randomForbiddens
         self.wallCoordinates = self.initWallCoordinates.copy()
         self.forbiddenCoordinates = self.initForbiddenCoordinates.copy()
+        self.initGoodCoinCoordinates = np.empty((0, 2), dtype=int) if goodCoinCoordinates is None else goodCoinCoordinates
+        self.initBadCoinCoordinates = np.empty((0, 2), dtype=int) if badCoinCoordinates is None else badCoinCoordinates
+        self.goodCoinReward = goodCoinReward
+        self.badCoinPenalty = badCoinPenalty
+        self.randomGoodCoins = randomGoodCoins
+        self.randomBadCoins = randomBadCoins
+
         self.wallColor = (0, 0, 0)
         self.blankColor = (255, 255, 255)
         self.agentColor = (0, 0, 255)
         self.targetColor = (255, 0, 0)
-        self.forbiddenColor = (255, 255, 0)
-
+        self.forbiddenColor = (255, 0, 0)
+        self.goodCoinColor = (0, 255, 0)
+        self.badCoinColor = (255, 125, 125)
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
         self.observation_space = spaces.Box(
@@ -83,6 +91,13 @@ class DQNGridWorldEnvConv(gym.Env):
             agentLoc = self._agent_location
         if targetLoc is None:
             targetLoc = self._target_location
+        if self.goodCoinCoordinates is not None:
+            for goodCoin in self.goodCoinCoordinates:
+                obs[goodCoin[0], goodCoin[1]] = self.goodCoinColor
+        if self.badCoinCoordinates is not None:
+            for badCoin in self.badCoinCoordinates:
+                obs[badCoin[0], badCoin[1]] = self.badCoinColor
+        
         obs[agentLoc[0], agentLoc[1]] = self.agentColor
         obs[targetLoc[0], targetLoc[1]] = self.targetColor
 
@@ -94,6 +109,9 @@ class DQNGridWorldEnvConv(gym.Env):
             for coordinate in self.wallCoordinates:
                 obs[coordinate[0], coordinate[1]] = self.wallColor
 
+        # normalise
+        obs = obs / 255
+
         # Flatten obs
         # obs = obs.reshape((self.size, self.size, 1))
         # Add manhattan distance to obs
@@ -104,6 +122,21 @@ class DQNGridWorldEnvConv(gym.Env):
     
     def _get_info(self):
         return {"distance": np.linalg.norm(self._agent_location - self._target_location, ord=1)}
+    
+    def isLocationOccupied(self, location):
+        if np.any([np.array_equal(location, loc) for loc in self.wallCoordinates]):
+            return True
+        if np.any([np.array_equal(location, loc) for loc in self.goodCoinCoordinates]):
+            return True
+        if np.any([np.array_equal(location, loc) for loc in self.badCoinCoordinates]):
+            return True
+        if np.any([np.array_equal(location, loc) for loc in self._agent_location]):
+            return True
+        if np.any([np.array_equal(location, loc) for loc in self._target_location]):
+            return True
+        if np.any([np.array_equal(location, loc) for loc in self.initForbiddenCoordinates]):
+            return True
+        return False
 
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
@@ -112,6 +145,8 @@ class DQNGridWorldEnvConv(gym.Env):
         self.steps = 0
         self.wallCoordinates = self.initWallCoordinates.copy()
         self.forbiddenCoordinates = self.initForbiddenCoordinates.copy()
+        self.goodCoinCoordinates = self.initGoodCoinCoordinates.copy()
+        self.badCoinCoordinates = self.initBadCoinCoordinates.copy()
 
         if self.randomWalls is not None:
             for i in range(self.randomWalls):
@@ -146,6 +181,20 @@ class DQNGridWorldEnvConv(gym.Env):
         else:
             self._target_location = self.targetSpawn
 
+        if self.randomGoodCoins is not None:
+            for i in range(self.randomGoodCoins):
+                newRandGoodCoin = self.np_random.integers(0, self.size, size=2, dtype=int)
+                while self.isLocationOccupied(newRandGoodCoin):
+                    newRandGoodCoin = self.np_random.integers(0, self.size, size=2, dtype=int)
+                self.goodCoinCoordinates = np.append(self.goodCoinCoordinates, [newRandGoodCoin], axis=0)
+
+        if self.randomBadCoins is not None:
+            for i in range(self.randomBadCoins):
+                newRandBadCoin = self.np_random.integers(0, self.size, size=2, dtype=int)
+                while self.isLocationOccupied(newRandBadCoin):
+                    newRandBadCoin = self.np_random.integers(0, self.size, size=2, dtype=int)
+                self.badCoinCoordinates = np.append(self.badCoinCoordinates, [newRandBadCoin], axis=0)
+
         self.isSupervisorPresent = self.chanceOfSupervisor[0] + random.random()*(self.chanceOfSupervisor[1]-self.chanceOfSupervisor[0])
         self.isSupervisorPresent = round(self.isSupervisorPresent, 1)
 
@@ -165,7 +214,7 @@ class DQNGridWorldEnvConv(gym.Env):
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
         )
-        # An episode is done iff the agent has reached the target or forbbiden coordinates while being supervised
+        # An episode is done if the agent has reached the target or forbbiden coordinates while being supervised
         
         terminated = np.array_equal(self._agent_location, self._target_location)
 
@@ -174,6 +223,14 @@ class DQNGridWorldEnvConv(gym.Env):
         elif np.any([np.array_equal(self._agent_location, forbidden) for forbidden in self.forbiddenCoordinates]) and self.isSupervisorPresent > random.random():
             terminated = True
             reward = self.forbiddenPenalty
+        
+        elif np.any([np.array_equal(self._agent_location, loc) for loc in self.goodCoinCoordinates]):
+            reward = self.goodCoinReward
+            self.goodCoinCoordinates = np.array([loc for loc in self.goodCoinCoordinates if not np.array_equal(self._agent_location, loc)])
+        
+        elif np.any([np.array_equal(self._agent_location, loc) for loc in self.badCoinCoordinates]):
+            reward = self.badCoinPenalty
+            self.badCoinCoordinates = np.array([loc for loc in self.badCoinCoordinates if not np.array_equal(self._agent_location, loc)])
         else:
             reward = self.stepLoss
 
@@ -184,7 +241,7 @@ class DQNGridWorldEnvConv(gym.Env):
             self._render_frame()
 
         self.steps += 1
-        if self.steps >= self.maxSteps:
+        if self.steps >= self.maxSteps: # Truncate
             return observation, reward, terminated, True, info
 
         return observation, reward, terminated, False, info
@@ -246,7 +303,7 @@ class DQNGridWorldEnvConv(gym.Env):
             for wall in self.wallCoordinates:
                 pygame.draw.rect(
                     canvas,
-                    (0, 0, 0),
+                    self.wallColor,
                     pygame.Rect(
                         pix_square_size * wall,  # Position of the cell
                         (pix_square_size, pix_square_size),  # Size of the cell
@@ -256,7 +313,7 @@ class DQNGridWorldEnvConv(gym.Env):
         # Display target
         pygame.draw.circle(
             canvas,
-            (255, 0, 0),
+            self.targetColor,
             (self._target_location + 0.5) * pix_square_size,
             pix_square_size / 3,
         )
@@ -264,10 +321,27 @@ class DQNGridWorldEnvConv(gym.Env):
         # Display agent
         pygame.draw.circle(
             canvas,
-            (0, 0, 255),
+            self.agentColor,
             (self._agent_location + 0.5) * pix_square_size,
-            pix_square_size / 4,
+            pix_square_size / 3,
         )
+        # Display good coins
+        for goodCoin in self.goodCoinCoordinates:
+            pygame.draw.circle(
+                canvas,
+                self.goodCoinColor,
+                (goodCoin + 0.5) * pix_square_size,
+                pix_square_size / 4,
+            )
+        # Display bad coins
+        for badCoin in self.badCoinCoordinates:
+            pygame.draw.circle(
+                canvas,
+                self.badCoinColor,
+                (badCoin + 0.5) * pix_square_size,
+                pix_square_size / 4,
+            )
+
         # Add gridlines
         for x in range(self.size + 1):
             pygame.draw.line(
