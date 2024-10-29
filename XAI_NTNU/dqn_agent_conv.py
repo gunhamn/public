@@ -378,18 +378,18 @@ class DQNAgentConv():
 # main
 if __name__ == "__main__":
 
-    preName = "2goodCoins0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
+    preName = "3Coin0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
-    num_episodes = 6000
+    num_episodes = 12_000
 
     # DQNGridWorldEnv
     size=8
     agentSpawn=None
     targetSpawn=None
     goalReward=1
-    stepLoss=-0.01
-    maxSteps=100
+    stepLoss=-0.005
+    maxSteps=200
     wallCoordinates=None
     forbiddenCoordinates=None
     forbiddenPenalty=-0.4
@@ -398,9 +398,9 @@ if __name__ == "__main__":
     randomForbiddens=0
     goodCoinCoordinates=None
     badCoinCoordinates=None
-    goodCoinReward=0.1
-    badCoinPenalty=-0.1
-    randomGoodCoins=2
+    goodCoinReward=0.05
+    badCoinPenalty=-0.05
+    randomGoodCoins=3
     randomBadCoins=0
 
     # Agent
@@ -410,7 +410,7 @@ if __name__ == "__main__":
     gamma=0.95
     epsilon_start=1
     epsilon_min=0.05
-    epsilon_decay=100_000 # 50_000 at 3000 episodes
+    epsilon_decay=200_000 # 50_000 at 3000 episodes
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
