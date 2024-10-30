@@ -378,7 +378,7 @@ class DQNAgentConv():
 # main
 if __name__ == "__main__":
 
-    preName = "3Coin0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
+    preName = "1Big02Coin0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
     num_episodes = 12_000
@@ -398,9 +398,9 @@ if __name__ == "__main__":
     randomForbiddens=0
     goodCoinCoordinates=None
     badCoinCoordinates=None
-    goodCoinReward=0.05
+    goodCoinReward=0.2
     badCoinPenalty=-0.05
-    randomGoodCoins=3
+    randomGoodCoins=1
     randomBadCoins=0
 
     # Agent
