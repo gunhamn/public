@@ -51,9 +51,8 @@ class neural_network(torch.nn.Module):
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         
-        self.flattened_size = 32 * size * channels  # Assuming input size is (channels, size, size) eller???
-        # (64x768 and 49152x128)
-        # Define the fully connected layers
+        self.flattened_size = 32 * size * channels
+        
         self.fc1 = nn.Linear(self.flattened_size, 128)
         self.fc2 = nn.Linear(128, action_space_n)
 
@@ -114,6 +113,9 @@ class DQNAgentConv():
         self.epsilon_history = []
         self.loss = 0.0
         self.loss_history = []
+        self.gradients_mean_history = []
+        self.gradients_stdev_history = []
+
 
     def get_action(self, state):
         sample = random.random()
@@ -133,6 +135,9 @@ class DQNAgentConv():
         rewardPerStep_t = torch.tensor(self.rewardPerStep_history, dtype=torch.float)
         epsilons_t = torch.tensor(self.epsilon_history, dtype=torch.float)
         loss_t = torch.tensor(self.loss_history, dtype=torch.float)
+        gradients_mean_t = torch.tensor(self.gradients_mean_history, dtype=torch.float)
+        gradients_stdev_t = torch.tensor(self.gradients_stdev_history, dtype=torch.float)
+        
         if show_result:
             plt.title('Result')
         else:
@@ -143,6 +148,9 @@ class DQNAgentConv():
         plt.plot(rewards_t.numpy(), label='Ep Reward')
         plt.plot(epsilons_t.numpy(), label='Epsilon')
         plt.plot(loss_t.numpy(), label='Loss')
+        plt.plot(gradients_mean_t.numpy(), label='Gradients mean')
+        plt.plot(gradients_stdev_t.numpy(), label='Gradients stdev')
+
         # Plot 100 episode averages
         if len(rewards_t) >= 100:
             means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
@@ -306,11 +314,23 @@ class DQNAgentConv():
                     self.rewardPerStep_history.append(episode_reward / (i + 1))
                     self.epsilon_history.append(epsilon)
                     self.loss_history.append(self.loss)
+
+                    gradients = []
+                    for p in self.policy_network.parameters():
+                        if p.grad is not None:
+                            gradients.extend(p.grad.data.cpu().numpy().flatten())  # Collect all gradient values
+                    gradients_mean = np.mean(gradients)
+                    gradients_std = np.std(gradients)
+                    self.gradients_mean_history.append(gradients_mean)
+                    self.gradients_stdev_history.append(gradients_std)
+                    
                     if self.wandb:
                         self.wandb.log({"episode_reward": episode_reward,
                                     "epsilon": epsilon,
                                     "rewardPerStep": episode_reward / (i + 1),
-                                    "loss": self.loss})
+                                    "loss": self.loss,
+                                    "gradient mean": gradients_mean,
+                                    "gradient std": gradients_std})
                     self.plot_rewards()
                     break
             
@@ -378,7 +398,7 @@ class DQNAgentConv():
 # main
 if __name__ == "__main__":
 
-    preName = "1Big02Coin0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
+    preName = "3Big02Coins0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
     num_episodes = 12_000
@@ -400,7 +420,7 @@ if __name__ == "__main__":
     badCoinCoordinates=None
     goodCoinReward=0.2
     badCoinPenalty=-0.05
-    randomGoodCoins=1
+    randomGoodCoins=3
     randomBadCoins=0
 
     # Agent
@@ -445,10 +465,10 @@ if __name__ == "__main__":
         wandb=wandb)
 
     # Todo:
-    # - normalize
+    # - normalize, check!
     # - plot everything (plot gradients, should be normal dist around 0)
     # - remove clipping, check!
-    # - maybe check gradients
+
 
     
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
