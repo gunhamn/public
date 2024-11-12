@@ -354,9 +354,7 @@ class DQNAgentConv():
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0) #.unsqueeze(1)
             episode_reward = 0
             for i in count():
-                # Select action with as set epsilon
-                sample = random.random()
-                if epsilon > sample:
+                if epsilon > random.random():
                     action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
                 else:
                     with torch.no_grad():
@@ -424,7 +422,7 @@ if __name__ == "__main__":
     randomBadCoins=0
 
     # Agent
-    useWandb = False
+    useWandb = True
     batch_size=64
     lr=0.001
     gamma=0.95
