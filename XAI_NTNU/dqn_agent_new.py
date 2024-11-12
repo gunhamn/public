@@ -34,7 +34,7 @@ from DQNGridWorldEnvConv import DQNGridWorldEnvConv
 # Q(s, a) = r + discountFactor * max[Q(s', a')]
 
 # Where:
-# Q(s, a) - "true" Q-value for s, a - state, action
+# Q(s, a) - Q-value for s, a - state, action
 # r - reward
 # discountFactor, a float like 0.95
 # max[Q(s', a')] the maximum q-value for all actions a' in the next state 's
@@ -122,22 +122,19 @@ class DqnAgentNew:
         timeStart = time.time()
         self.steps_done = 0
         wandFrequency = 1000
-
-        lastEpisodeReward = 0
-        cummulativeReward = 0
-        maxReward = 0
-        minReward = 0
+        lastEpisodeReward, cummulativeReward, cummulativeSteps, maxReward = 0, 0, 0, 0
+        minReward = 2 # something over maximum reward
         while self.steps_done < max_steps:
-            for percent in [0.01, 0.1, 0.5, 0.99]:
-                if self.steps_done == max_steps * percent:
-                    self.printProgress(timeStart, percent)
+            episodeSteps, episodeReward = 0, 0
             state, _ = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             terminated = False
             truncated = False
-            episodeSteps = 0
             try:
                 while not terminated and not truncated:
+                    if self.steps_done in [int(x*max_steps) for x in [0.01, 0.1, 0.5, 0.99]]: # print percentages
+                        self.printProgress(timeStart, round(self.steps_done/max_steps, 2))
+
                     epsilon = self.epsilon_exp_decay(max_steps)
                     if np.random.rand() < epsilon:
                         action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
@@ -149,69 +146,45 @@ class DqnAgentNew:
 
                     # For plotting in wandb
                     cummulativeReward += reward
+                    episodeReward += reward
                     if terminated or truncated:
-                        lastEpisodeReward = reward
-                        maxReward = max(maxReward, reward)
-                        minReward = min(minReward, reward)
+                        lastEpisodeReward = episodeReward
+                        maxReward = max(maxReward, episodeReward)
+                        minReward = min(minReward, episodeReward)
                     
                     reward = torch.tensor([reward], device=self.device)
-                    terminated = torch.tensor([terminated], device=self.device)
-
-                    # Handle truncation like Jacob's dqn (need to research this)
-                    if not truncated:
-                        next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
-                    else:
-                        state = next_state
+                    terminated = torch.tensor([terminated], dtype=torch.bool, device=self.device)
+                    next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                
+                    # Handle truncation  here?
 
                     self.replay_buffer.append((state, action, next_state, reward, terminated))
+                    
                     state = next_state
                     self.steps_done += 1
                     episodeSteps += 1
+                    cummulativeSteps += 1
 
                     if self.steps_done % self.trainFrequency == 0:
                         if len(self.replay_buffer) >= self.batch_size:
-
-                            print(f"{self.steps_done} steps done, training initiated")
-                            
                             # Sample a batch of transitions
                             batch = random.sample(self.replay_buffer, self.batch_size)
 
-                            # Unzip the batch
+                            # Unpack the batch
                             states, actions, next_states, rewards, terminateds = zip(*batch)
-                            if self.steps_done == 330:
-                                print("debug")
-                                print(f"states: {states}")
-                            # Ensure all elements in `states` are PyTorch tensors
-                            states = [torch.tensor(state, device=self.device, dtype=torch.float32) if not isinstance(state, torch.Tensor) else state for state in states]
 
-                            states = torch.cat(states, dim=0).to(self.device)
-                            actions = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device)
-                            next_states = torch.cat(next_states, dim=0).to(self.device)
-                            rewards = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device)
-                            terminateds = torch.tensor(np.array(terminateds), dtype=torch.float32, device=self.device)
+                            # Convert the batch to tensors
+                            states = torch.cat(states) # float32, torch.Size([64, 8, 8, 3])
+                            actions = torch.cat(actions) # int64, torch.Size([64, 1])
+                            next_states = torch.cat(next_states) # float32, torch.Size([64, 8, 8, 3])
+                            rewards = torch.cat(rewards) # float32, torch.Size([64])
+                            terminateds = torch.cat(terminateds).to(torch.int8).to(self.device) # was bool, now int8, torch.Size([64])
 
-                            print(f"states.shape: {states.shape}")
-                            print(f"actions.shape: {actions.shape}")
-                            print(f"next_states.shape: {next_states.shape}")
-                            print(f"rewards.shape: {rewards.shape}")
-                            print(f"terminateds.shape: {terminateds.shape}")
-
+                            # Q(s, a) = r + discountFactor * max[Q(s', a')], only return reward if terminated
                             with torch.no_grad():
-                                next_state_actions = self.policy_net(next_states).argmax(dim=1)
-                                next_state_values = self.target_net(next_states)
-                                next_state_action_values = next_state_values.gather(1, next_state_actions.unsqueeze(1)).squeeze(1)
-                                target_q_values = rewards + self.gamma * (1 - terminateds) * next_state_action_values
-                            
-                            print(f"next_state_actions.shape: {next_state_actions.shape}")
-                            print(f"next_state_values.shape: {next_state_values.shape}")
-                            print(f"target_q_values.shape: {target_q_values.shape}")
-                            print(f"states.shape: {states.shape}")
-                            print(f"actions.shape: {actions.shape}")
-                            
-                            print(f"actions.shape: {actions.shape}")
-
-                            q_values = self.target_net(states).gather(1, actions.squeeze(1)).squeeze(1)
-                            loss = nn.functional.mse_loss(q_values, target_q_values)
+                                targets = rewards + self.gamma * self.target_net(next_states).max(1)[0] * (1 - terminateds) # float32, torch.Size([64])
+                            predictions = self.policy_net(states).gather(1, actions).squeeze() # float32, torch.Size([64])
+                            loss = nn.functional.mse_loss(predictions, targets)
                             self.optimizer.zero_grad()
                             loss.backward()
                             self.optimizer.step()
@@ -224,17 +197,71 @@ class DqnAgentNew:
                             self.wandb.log({
                                 "epsilon": epsilon,
                                 "loss": loss.item(),
-                                "reward/episodeSteps": cummulativeReward / episodeSteps,
+                                "reward/episodeSteps": cummulativeReward / cummulativeSteps,
                                 "lastEpisodeReward": lastEpisodeReward,
                                 f"maxReward, {wandFrequency} steps": maxReward,
                                 f"minReward, {wandFrequency} steps": minReward
                             })
-                            cummulativeReward, maxReward, minReward = 0, 0, 0
+                            cummulativeReward, cummulativeSteps, maxReward, minReward = 0, 0, 0, 0
 
             # Ctrl+C to evaluate agent
             except KeyboardInterrupt:
                 print("Training interrupted")
                 break
+    
+    def inference(self, env, max_steps=1_000_000, epsilon=0.05):
+        timeStart = time.time()
+        self.steps_done = 0
+        wandFrequency = 1000
+        lastEpisodeReward = 0
+        cummulativeReward, maxReward, minReward, episodeSteps, episodeReward = 0, 0, 0, 0, 0
+        while self.steps_done < max_steps:
+            state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            terminated = False
+            truncated = False
+            while not terminated and not truncated:
+                if self.steps_done in [int(x*max_steps) for x in [0.01, 0.1, 0.5, 0.99]]: # print percentages
+                    self.printProgress(timeStart, round(self.steps_done/max_steps, 2))
+
+                if np.random.rand() < epsilon:
+                    action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
+                else:
+                    with torch.no_grad():
+                        action = self.policy_net(state).max(1)[1].view(1, 1)
+                
+                next_state, reward, terminated, truncated, _ = env.step(action.item())
+
+                # For plotting in wandb
+                cummulativeReward += reward
+                episodeReward += reward
+                if terminated or truncated:
+                    lastEpisodeReward = episodeReward
+                    maxReward = max(maxReward, episodeReward)
+                    minReward = min(minReward, episodeReward)
+                
+                reward = torch.tensor([reward], device=self.device)
+                terminated = torch.tensor([terminated], dtype=torch.bool, device=self.device)
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            
+                # Handle truncation  here?
+
+                self.replay_buffer.append((state, action, next_state, reward, terminated))
+                
+                state = next_state
+                self.steps_done += 1
+                episodeSteps += 1
+
+                if self.steps_done % wandFrequency == 0:
+                    if self.wandb:
+                        self.wandb.log({
+                            "epsilon": epsilon,
+                            "reward/episodeSteps": cummulativeReward / episodeSteps,
+                            "lastEpisodeReward": lastEpisodeReward,
+                            f"maxReward, {wandFrequency} steps": maxReward,
+                            f"minReward, {wandFrequency} steps": minReward
+                        })
+                        cummulativeReward, maxReward, minReward, episodeSteps, episodeReward = 0, 0, 0, 0, 0
 
     def epsilon_exp_decay(self, max_steps):
         decay_rate = np.log(self.epsilon_min / self.epsilon_start) / max_steps
@@ -256,7 +283,7 @@ if __name__ == "__main__":
     preName = "3Big02Coins0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
 
     # Config
-    max_steps=1_000_000
+    max_steps=500_000
 
     # DQNGridWorldEnv
     size=8
@@ -279,7 +306,7 @@ if __name__ == "__main__":
     randomBadCoins=0
 
     # Agent
-    useWandb = False
+    useWandb = True
     batch_size=64
     lr=0.001
     gamma=0.95
@@ -330,9 +357,10 @@ if __name__ == "__main__":
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
     # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
-    agent.train(env=env, max_steps=max_steps)
+    agent.train(env=env, max_steps=max_steps) 
     # chanceOfSupervisor=[0.0, 1]
-    if preName is not None:
-        agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}_{size}x{size}_{max_steps}steps.pth")
-    show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=None, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=20, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens, goodCoinCoordinates=goodCoinCoordinates, badCoinCoordinates=badCoinCoordinates, goodCoinReward=goodCoinReward, badCoinPenalty=badCoinPenalty, randomGoodCoins=randomGoodCoins, randomBadCoins=randomBadCoins)
-    #agent.inference(env=show_env, num_episodes=50, epsilon=epsilon_min)
+    #if preName is not None:
+    #    agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}_{size}x{size}_{max_steps}steps.pth")
+    show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=20, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens, goodCoinCoordinates=goodCoinCoordinates, badCoinCoordinates=badCoinCoordinates, goodCoinReward=goodCoinReward, badCoinPenalty=badCoinPenalty, randomGoodCoins=randomGoodCoins, randomBadCoins=randomBadCoins)
+    agent.wandb = False
+    agent.inference(env=show_env, max_steps=max_steps, epsilon=epsilon_min)
