@@ -103,6 +103,7 @@ class ChestWorld(gym.Env):
         super().reset(seed=seed)
         
         self.steps = 0
+        self.agentKeys = 0
         self.wallCoordinates = self.initWallCoordinates.copy()
         self.chestCoordinates = self.initchestCoordinates.copy()
         self.keyCoordinates = self.initkeyCoordinates.copy()

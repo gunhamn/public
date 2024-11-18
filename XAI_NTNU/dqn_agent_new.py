@@ -11,7 +11,7 @@ from datetime import datetime
 import random
 import wandb
 
-from DQNGridWorldEnvConv import DQNGridWorldEnvConv
+from ChestWorld import ChestWorld
 
 # A DQN is a RL-agent that takes action in an enviroment where it at some point gains rewards from the environment.
 # D stands for Deep as in Deep Learning, which means that the algorithm uses a neural network to approximate q-values
@@ -122,8 +122,10 @@ class DqnAgentNew:
         timeStart = time.time()
         self.steps_done = 0
         wandFrequency = 1000
-        lastEpisodeReward, cummulativeReward, cummulativeSteps, maxReward = 0, 0, 0, 0
-        minReward = 2 # something over maximum reward
+        loss = torch.tensor([0], dtype=torch.float32, device=self.device) # for plotting in wandb
+        lastEpisodeReward, cummulativeReward, cummulativeSteps = 0, 0, 0
+        maxReward = -2 # a number under minimum reward
+        minReward = 2 # a number over maximum reward
         while self.steps_done < max_steps:
             episodeSteps, episodeReward = 0, 0
             state, _ = env.reset()
@@ -201,7 +203,7 @@ class DqnAgentNew:
                             f"maxReward, {wandFrequency} steps": maxReward,
                             f"minReward, {wandFrequency} steps": minReward
                         })
-                        cummulativeReward, cummulativeSteps, maxReward, minReward = 0, 0, 0, 2
+                        cummulativeReward, cummulativeSteps, maxReward, minReward = 0, 0, -2, 2
 
             # Ctrl+C to evaluate agent
             except KeyboardInterrupt:
@@ -222,39 +224,39 @@ class DqnAgentNew:
         finish_time_readable = datetime.fromtimestamp(est_finish_time).strftime('%Y-%m-%d %H:%M:%S')
         print(f"{int(percent*100)}%, time elapsed: {int(minutes)} minutes and {seconds:.2f} seconds, it may finish around: {finish_time_readable}")
 
+    def save_model_weights(self, path):
+        torch.save(self.policy_net.state_dict(), path)
+        print(f"Model saved: {path}")
+
+    def load_model_weights(self, path):
+        self.policy_net.load_state_dict(torch.load(path))
+        self.policy_net.eval()
+        print(f"Model loaded: {path}")
 
 
 
 
 if __name__ == "__main__":
 
-    preName = "3Big02Coins0walls" #"PreTrainedConv2RandAbs3walls0to1"   #+ "_6x6_3000episodes"
-
     # Config
-    max_steps=500_000
+    max_steps=50_000_000
 
-    # DQNGridWorldEnv
-    size=8
-    agentSpawn=None
-    targetSpawn=None
-    goalReward=1
-    stepLoss=-0.005
+    # ChestWorld
+    render_mode=None
+    size=6
+    agentSpawn = None
+    q_values=None
     maxSteps=200
+    stepLoss=-1/maxSteps # min reward should be -1
     wallCoordinates=None
-    forbiddenCoordinates=None
-    forbiddenPenalty=-0.4
-    chanceOfSupervisor=[0.0, 1]
-    randomWalls=0
-    randomForbiddens=0
-    goodCoinCoordinates=None
-    badCoinCoordinates=None
-    goodCoinReward=0.2
-    badCoinPenalty=-0.05
-    randomGoodCoins=3
-    randomBadCoins=0
-
+    randomWalls=2
+    chestCoordinates=None
+    keyCoordinates=None
+    randomchests=3
+    randomkeys=6
+    chestReward=1/min(randomchests, randomkeys) # max reward should be 1
+    
     # Agent
-    useWandb = True
     batch_size=64
     lr=0.001
     gamma=0.95
@@ -264,11 +266,16 @@ if __name__ == "__main__":
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
+    model_name = f"CW_{randomchests}chests_{randomkeys}keys_{randomWalls}walls_{size}x{size}_{max_steps}steps"
+
+    useWandb = True
+    saveModel = True
+
     if useWandb:
-        wandb.init(project=f"{preName}_{size}x{size}_{max_steps}steps",
+        wandb.init(project=model_name,
             config={
             "size": size,
-            "goalReward": goalReward,
+            "goalReward": chestReward,
             "stepLoss": stepLoss,
             "maxSteps": maxSteps,
             "batch_size": batch_size,
@@ -281,8 +288,8 @@ if __name__ == "__main__":
     else:
         wandb = False
 
-    env = DQNGridWorldEnvConv(render_mode=None, size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens, goodCoinCoordinates=goodCoinCoordinates, badCoinCoordinates=badCoinCoordinates, goodCoinReward=goodCoinReward, badCoinPenalty=badCoinPenalty, randomGoodCoins=randomGoodCoins, randomBadCoins=randomBadCoins)
-    observation, info = env.reset()
+    env = ChestWorld(render_mode=None, size=size, agentSpawn=agentSpawn, q_values=q_values, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
+    observation, _ = env.reset()
     agent = DqnAgentNew(env.action_space, observation,
         batch_size=batch_size,
         lr=lr,
@@ -293,13 +300,6 @@ if __name__ == "__main__":
         tau=tau,
         replayBuffer=replayBuffer,
         wandb=wandb)
-
-    # Todo:
-    # - normalize, check!
-    # - plot everything (plot gradients, should be normal dist around 0)
-    # - remove clipping, check!
-
-
     
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation:\n {observation}")
@@ -307,8 +307,9 @@ if __name__ == "__main__":
     # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
     agent.train(env=env, max_steps=max_steps) 
     # chanceOfSupervisor=[0.0, 1]
-    #if preName is not None:
-    #    agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{preName}_{size}x{size}_{max_steps}steps.pth")
-    show_env = DQNGridWorldEnvConv(render_mode="human", size=size, agentSpawn=agentSpawn, targetSpawn=targetSpawn, goalReward=goalReward, stepLoss=stepLoss, maxSteps=20, wallCoordinates=wallCoordinates, forbiddenCoordinates=forbiddenCoordinates, forbiddenPenalty=forbiddenPenalty, chanceOfSupervisor=chanceOfSupervisor, randomWalls=randomWalls, randomForbiddens=randomForbiddens, goodCoinCoordinates=goodCoinCoordinates, badCoinCoordinates=badCoinCoordinates, goodCoinReward=goodCoinReward, badCoinPenalty=badCoinPenalty, randomGoodCoins=randomGoodCoins, randomBadCoins=randomBadCoins)
+    if saveModel:
+        agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{model_name}.pth")
+    maxSteps = 30
+    show_env = ChestWorld(render_mode="human", size=size, agentSpawn=agentSpawn, q_values=q_values, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
     agent.wandb = False
     agent.inference(env=show_env, max_steps=max_steps, epsilon=epsilon_min)
