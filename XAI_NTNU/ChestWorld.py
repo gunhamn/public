@@ -47,8 +47,7 @@ class ChestWorld(gym.Env):
             0: np.array([1, 0]), # Right
             1: np.array([0, 1]), # Down
             2: np.array([-1, 0]), # Left
-            3: np.array([0, -1]), # Up
-        }
+            3: np.array([0, -1])} # Up
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode

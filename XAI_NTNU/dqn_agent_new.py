@@ -79,13 +79,13 @@ class neural_network(torch.nn.Module):
 
     def forward(self, x):
         # Ensure the input has the correct shape [batch_size, channels, height, width]
-        #x = x.unsqueeze(1)  # Add channel dimension
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
-        return self.fc2(x)
+        x = self.fc2(x)
+        return x
 
 
 class DqnAgentNew:
@@ -213,6 +213,10 @@ class DqnAgentNew:
     def inference(self, env, max_steps=1_000_000, epsilon=0.05):
         self.train(env, max_steps, train=False, fixedEpsilon=epsilon)
         
+    def predict(self, state):
+        with torch.no_grad():
+            return self.policy_net(state)
+
     def epsilon_exp_decay(self, max_steps):
         decay_rate = np.log(self.epsilon_min / self.epsilon_start) / max_steps
         return self.epsilon_start * np.exp(decay_rate * self.steps_done)
@@ -239,21 +243,21 @@ class DqnAgentNew:
 if __name__ == "__main__":
 
     # Config
-    max_steps=50_000_000
+    max_steps=10_000_000
 
     # ChestWorld
     render_mode=None
-    size=6
+    size=8
     agentSpawn = None
     q_values=None
     maxSteps=200
     stepLoss=-1/maxSteps # min reward should be -1
     wallCoordinates=None
-    randomWalls=2
+    randomWalls=0
     chestCoordinates=None
     keyCoordinates=None
     randomchests=3
-    randomkeys=6
+    randomkeys=5
     chestReward=1/min(randomchests, randomkeys) # max reward should be 1
     
     # Agent
@@ -305,8 +309,7 @@ if __name__ == "__main__":
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
     # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
-    agent.train(env=env, max_steps=max_steps) 
-    # chanceOfSupervisor=[0.0, 1]
+    agent.train(env=env, max_steps=max_steps)
     if saveModel:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{model_name}.pth")
     maxSteps = 30
