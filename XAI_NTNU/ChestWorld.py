@@ -8,14 +8,13 @@ from gymnasium import spaces
 
 
 class ChestWorld(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 2}
 
-    def __init__(self, render_mode=None, size=6, agentSpawn = None, q_values=None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, chestCoordinates=None, keyCoordinates=None, chestReward=0.1, randomchests=None, randomkeys=None):
+    def __init__(self, render_mode=None, size=6, agentSpawn = None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, chestCoordinates=None, keyCoordinates=None, chestReward=0.1, randomchests=None, randomkeys=None):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.window_size = 512  # The size of the PyGame window
-        self.q_values = q_values
-        self.cell_q_values = np.zeros((self.size, self.size)) # Q-values for each cell and action
+        self.q_values = np.zeros((self.size, self.size)) # Q-values for each cell and action
         self.stepLoss = stepLoss
         self.maxSteps = maxSteps
         self.steps = 0
@@ -35,6 +34,8 @@ class ChestWorld(gym.Env):
         self.chestColor = (255, 0, 0)
         self.keyColor = (0, 255, 0)
         self.agentKeyColor = (0, 50, 0)
+        self.q_valueMaxColor = (255, 100, 100)
+        self.q_valueMinColor = (255, 255, 255)
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
         self.observation_space = spaces.Box(
@@ -196,27 +197,16 @@ class ChestWorld(gym.Env):
         pix_square_size = self.window_size / self.size # The size of a single grid square in pixels
 
         # Display Q-values as colored cell background
-        if self.cell_q_values is not None:
-            color_low = np.array([255, 255, 255])  # White for low Q-values
-            color_high = np.array([255, 100, 100])  # Red for high Q-values
-            for i in range(self.size):
-                for j in range(self.size):
-                    # Get the normalized q_value for this cell
-                    q_value = self.cell_q_values[i, j]
-
-                    # Interpolate the color based on the q_value (between 0 and 1)
-                    color = color_high * q_value + color_low * (1 - q_value)
-
-                    # Draw the background rectangle for this cell
-                    pygame.draw.rect(
-                        canvas,
-                        color,
-                        pygame.Rect(
-                            pix_square_size * np.array([j, i]),  # Position of the cell
-                            (pix_square_size, pix_square_size),  # Size of the cell
-                        ),
-                    )
-        
+        for i, j in np.ndindex(self.q_values.shape):
+            pygame.draw.rect(
+                canvas,
+                tuple(int(self.q_valueMaxColor[c] * self.q_values[i, j] + self.q_valueMinColor[c] * (1 - self.q_values[i, j]))for c in range(3)),  # Iterate over R, G, B channels
+                pygame.Rect(
+                    pix_square_size * np.array([i, j]),  # Position of the cell
+                    (pix_square_size, pix_square_size),  # Size of the cell
+                ),
+            )
+    
         # Display walls
         if self.wallCoordinates is not None:
             for wall in self.wallCoordinates:
@@ -294,12 +284,12 @@ class ChestWorld(gym.Env):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
-    
+
 
 # if main
 
 if __name__ == "__main__":
-    
+
     # Initialize pygame
     pygame.init()
 

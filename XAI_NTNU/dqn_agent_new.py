@@ -118,7 +118,7 @@ class DqnAgentNew:
         np.random.seed(48)
         torch.manual_seed(48)
 
-    def train(self, env, max_steps=1_000_000, train=True, fixedEpsilon=None):
+    def train(self, env, max_steps=1_000_000, train=True, fixedEpsilon=None, renderQvalues=False):
         timeStart = time.time()
         self.steps_done = 0
         wandFrequency = 1000
@@ -144,6 +144,8 @@ class DqnAgentNew:
                         with torch.no_grad():
                             action = self.policy_net(state).max(1)[1].view(1, 1)
                     
+                    if renderQvalues:
+                        env.q_values = self.getQvalues(env, normalize=True)
                     next_state, reward, terminated, truncated, _ = env.step(action.item())
 
                     # For plotting in wandb
@@ -210,8 +212,8 @@ class DqnAgentNew:
                 print("Training interrupted")
                 break
     
-    def inference(self, env, max_steps=1_000_000, epsilon=0.05):
-        self.train(env, max_steps, train=False, fixedEpsilon=epsilon)
+    def inference(self, env, max_steps=1_000_000, epsilon=0.05, renderQvalues=False):
+        self.train(env, max_steps, train=False, fixedEpsilon=epsilon, renderQvalues=renderQvalues)
         
     def predict(self, state):
         with torch.no_grad():
@@ -220,6 +222,18 @@ class DqnAgentNew:
     def epsilon_exp_decay(self, max_steps):
         decay_rate = np.log(self.epsilon_min / self.epsilon_start) / max_steps
         return self.epsilon_start * np.exp(decay_rate * self.steps_done)
+    
+    def getQvalues(self, env, normalize=True):
+        qValues = np.zeros((env.size, env.size))
+        for i in range(len(qValues)):
+            for j in range(len(qValues[i])):
+                state = env._get_obs(agentLoc=np.array([i, j]))
+                state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                qValues[i][j] = self.predict(state).max(1)[0].item()
+        if normalize:
+            qValues = (qValues - qValues.min()) / (qValues.max() - qValues.min())
+        return qValues
+
             
     def printProgress(self, timeStart, percent):
         elapsed_time = time.time() - timeStart
@@ -243,21 +257,20 @@ class DqnAgentNew:
 if __name__ == "__main__":
 
     # Config
-    max_steps=10_000_000
+    max_steps=1000
 
     # ChestWorld
     render_mode=None
-    size=8
+    size=6
     agentSpawn = None
-    q_values=None
     maxSteps=200
     stepLoss=-1/maxSteps # min reward should be -1
     wallCoordinates=None
     randomWalls=0
     chestCoordinates=None
     keyCoordinates=None
-    randomchests=3
-    randomkeys=5
+    randomchests=5
+    randomkeys=3
     chestReward=1/min(randomchests, randomkeys) # max reward should be 1
     
     # Agent
@@ -272,8 +285,8 @@ if __name__ == "__main__":
 
     model_name = f"CW_{randomchests}chests_{randomkeys}keys_{randomWalls}walls_{size}x{size}_{max_steps}steps"
 
-    useWandb = True
-    saveModel = True
+    useWandb = False
+    saveModel = False
 
     if useWandb:
         wandb.init(project=model_name,
@@ -292,7 +305,7 @@ if __name__ == "__main__":
     else:
         wandb = False
 
-    env = ChestWorld(render_mode=None, size=size, agentSpawn=agentSpawn, q_values=q_values, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
+    env = ChestWorld(render_mode=None, size=size, agentSpawn=agentSpawn, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
     observation, _ = env.reset()
     agent = DqnAgentNew(env.action_space, observation,
         batch_size=batch_size,
@@ -308,11 +321,29 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
+    agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/modelsToEval/CW_5chests_3keys_6x6_10000000steps.pth")
+    print(f"q values: {agent.getQvalues(env)}")
     # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
-    agent.train(env=env, max_steps=max_steps)
+    #agent.train(env=env, max_steps=max_steps)
     if saveModel:
         agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{model_name}.pth")
     maxSteps = 30
-    show_env = ChestWorld(render_mode="human", size=size, agentSpawn=agentSpawn, q_values=q_values, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
+    show_env = ChestWorld(render_mode="human", size=size, agentSpawn=agentSpawn, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
     agent.wandb = False
-    agent.inference(env=show_env, max_steps=max_steps, epsilon=epsilon_min)
+    agent.inference(env=show_env, max_steps=1000, epsilon=epsilon_min, renderQvalues=True)
+
+
+
+"""
+Goal misgeneralisation maze
+                    np.array([                                  [0, 4],
+                                [1, 0], [1, 1],         [1, 3], [1, 4], [1, 5],         [1, 7], [1, 8], 
+                                        [2, 1],         [2, 3],
+                                        [3, 1],         [3, 3], [3, 4], [3, 5], [3, 6], [3, 7],
+                                                        [4, 3],
+                                        [5, 1],         [5, 3], [5, 4], [5, 5],         [5, 7],
+                                        [6, 1],                                         [6, 7],
+                                        [7, 1],         [7, 3], [7, 4], [7, 5], [7, 6], [7, 7],
+                                        [8, 1],                         [6, 5]
+                                ])
+"""
