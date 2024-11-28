@@ -8,13 +8,14 @@ from gymnasium import spaces
 
 
 class ChestWorld(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 2}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 1}
 
     def __init__(self, render_mode=None, size=6, agentSpawn = None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, chestCoordinates=None, keyCoordinates=None, chestReward=0.1, randomchests=None, randomkeys=None):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.window_size = 512  # The size of the PyGame window
         self.q_values = np.zeros((self.size, self.size)) # Q-values for each cell and action
+        self.q_value_actions = np.zeros((self.size, self.size))
         self.stepLoss = stepLoss
         self.maxSteps = maxSteps
         self.steps = 0
@@ -34,8 +35,8 @@ class ChestWorld(gym.Env):
         self.chestColor = (255, 0, 0)
         self.keyColor = (0, 255, 0)
         self.agentKeyColor = (0, 50, 0)
-        self.q_valueMaxColor = (255, 100, 100)
-        self.q_valueMinColor = (255, 255, 255)
+        self.q_valueMaxColor = (200, 135, 100)
+        self.q_valueMinColor = (255, 230, 200)
 
         # Set the observation space as a matrix of size x size x 3 (for RGB)
         self.observation_space = spaces.Box(
@@ -44,11 +45,17 @@ class ChestWorld(gym.Env):
 
         # We have 4 actions, corresponding to "right", "up", "left", "down"
         self.action_space = spaces.Discrete(4)
-        self._action_to_direction = {
+        self.action_to_direction = {
             0: np.array([1, 0]), # Right
             1: np.array([0, 1]), # Down
             2: np.array([-1, 0]), # Left
             3: np.array([0, -1])} # Up
+        
+        self.action_to_arrow = {
+            0: "🠪", # Right   """🠤🠥🠦🠧🠨🠩🠪🠫🠬"""
+            1: "🠫", # Down
+            2: "🠨", # Left
+            3: "🠩"} # Up 
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -145,7 +152,7 @@ class ChestWorld(gym.Env):
     
     def step(self, action):
         # Map the action (element of {0,1,2,3}) to the direction we walk in
-        direction = self._action_to_direction[action]
+        direction = self.action_to_direction[action]
 
         # Check if the agent is trying to walk into a wall
         if np.any([np.array_equal(self._agent_location + direction, wall) for wall in self.wallCoordinates]):
@@ -186,6 +193,7 @@ class ChestWorld(gym.Env):
         if self.window is None and self.render_mode == "human":
             pygame.init()
             pygame.display.init()
+            pygame.font.init()
             self.window = pygame.display.set_mode(
                 (self.window_size, self.window_size)
             )
@@ -207,6 +215,14 @@ class ChestWorld(gym.Env):
                 ),
             )
     
+        # Display q-value arrows
+        if self.q_value_actions is not None:
+            for i, j in np.ndindex(self.q_value_actions.shape):
+                font = pygame.font.SysFont('Segoe UI Symbol', int(pix_square_size/ 1.7))
+                text = font.render(self.action_to_arrow[self.q_value_actions[i, j]], True, (255, 255, 255))
+                text_rect = text.get_rect(center=(pix_square_size * i + pix_square_size / 2, pix_square_size * j + pix_square_size / 2))
+                canvas.blit(text, text_rect)
+
         # Display walls
         if self.wallCoordinates is not None:
             for wall in self.wallCoordinates:

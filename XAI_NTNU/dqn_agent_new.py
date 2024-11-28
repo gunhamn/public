@@ -146,6 +146,7 @@ class DqnAgentNew:
                     
                     if renderQvalues:
                         env.q_values = self.getQvalues(env, normalize=True)
+                        env.q_value_actions = self.getQvalueActions(env)
                     next_state, reward, terminated, truncated, _ = env.step(action.item())
 
                     # For plotting in wandb
@@ -234,6 +235,14 @@ class DqnAgentNew:
             qValues = (qValues - qValues.min()) / (qValues.max() - qValues.min())
         return qValues
 
+    def getQvalueActions(self, env):
+        qValueActions = np.zeros((env.size, env.size))
+        for i in range(len(qValueActions)):
+            for j in range(len(qValueActions[i])):
+                state = env._get_obs(agentLoc=np.array([i, j]))
+                state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                qValueActions[i][j] = self.predict(state).max(1)[1].item()
+        return qValueActions
             
     def printProgress(self, timeStart, percent):
         elapsed_time = time.time() - timeStart
@@ -269,8 +278,8 @@ if __name__ == "__main__":
     randomWalls=0
     chestCoordinates=None
     keyCoordinates=None
-    randomchests=5
-    randomkeys=3
+    randomchests=3
+    randomkeys=5
     chestReward=1/min(randomchests, randomkeys) # max reward should be 1
     
     # Agent
@@ -321,8 +330,9 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
-    agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/modelsToEval/CW_5chests_3keys_6x6_10000000steps.pth")
+    agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/modelsToEval/CW_3chests_5keys_6x6_10000000steps.pth")
     print(f"q values: {agent.getQvalues(env)}")
+    print(f"q value actions: {agent.getQvalueActions(env)}")
     # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
     #agent.train(env=env, max_steps=max_steps)
     if saveModel:
