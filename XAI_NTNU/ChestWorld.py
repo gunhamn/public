@@ -10,11 +10,11 @@ from gymnasium import spaces
 class ChestWorld(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 1}
 
-    def __init__(self, render_mode=None, size=6, agentSpawn = None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, chestCoordinates=None, keyCoordinates=None, chestReward=0.1, randomchests=None, randomkeys=None):
+    def __init__(self, render_mode=None, size=6, agentSpawn = None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, chestCoordinates=None, keyCoordinates=None, chestReward=0.1, randomchests=None, randomkeys=None, saveImages=False):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.window_size = 512  # The size of the PyGame window
-        self.q_values = np.zeros((self.size, self.size)) # Q-values for each cell and action
+        self.q_values = None #np.zeros((self.size, self.size)) # Q-values for each cell and action
         self.q_value_actions = np.zeros((self.size, self.size))
         self.stepLoss = stepLoss
         self.maxSteps = maxSteps
@@ -28,6 +28,7 @@ class ChestWorld(gym.Env):
         self.randomchests = randomchests
         self.randomkeys = randomkeys
         self.agentKeys = 0
+        self.saveImages = saveImages
 
         self.wallColor = (0, 0, 0)
         self.blankColor = (255, 255, 255)
@@ -205,15 +206,16 @@ class ChestWorld(gym.Env):
         pix_square_size = self.window_size / self.size # The size of a single grid square in pixels
 
         # Display Q-values as colored cell background
-        for i, j in np.ndindex(self.q_values.shape):
-            pygame.draw.rect(
-                canvas,
-                tuple(int(self.q_valueMaxColor[c] * self.q_values[i, j] + self.q_valueMinColor[c] * (1 - self.q_values[i, j]))for c in range(3)),  # Iterate over R, G, B channels
-                pygame.Rect(
-                    pix_square_size * np.array([i, j]),  # Position of the cell
-                    (pix_square_size, pix_square_size),  # Size of the cell
-                ),
-            )
+        if self.q_values is not None:
+            for i, j in np.ndindex(self.q_values.shape):
+                pygame.draw.rect(
+                    canvas,
+                    tuple(int(self.q_valueMaxColor[c] * self.q_values[i, j] + self.q_valueMinColor[c] * (1 - self.q_values[i, j]))for c in range(3)),  # Iterate over R, G, B channels
+                    pygame.Rect(
+                        pix_square_size * np.array([i, j]),  # Position of the cell
+                        (pix_square_size, pix_square_size),  # Size of the cell
+                    ),
+                )
     
         # Display q-value arrows
         if self.q_value_actions is not None:
@@ -283,6 +285,12 @@ class ChestWorld(gym.Env):
                 (pix_square_size * x, self.window_size),
                 width=3,
             )
+
+        if self.saveImages:
+            frame_number = getattr(self, '_frame_number', 0)  # Keep track of frame numbers
+            pygame.image.save(canvas, f"frame_{frame_number:04d}.png")
+            print(f"Saved frame_{frame_number:04d}.png")
+            self._frame_number = frame_number + 1  # Increment frame counter
 
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window

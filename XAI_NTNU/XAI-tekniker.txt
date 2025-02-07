@@ -1,0 +1,11 @@
+
+Display go to - q values
+Fixa shap: random, 10 bilder
+
+
+saliency maps
+grad cam
+Deep lift
+intergrated gradients (IG)
+interpretable ml bug, forklarer forskjellihe saliency metoder (grad cam, smooth grad)
+kontrafaktisk forklaringer (eller?? Nej....)

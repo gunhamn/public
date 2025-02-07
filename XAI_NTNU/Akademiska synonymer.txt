@@ -1,0 +1,73 @@
+1
+scrutinise
+examine
+inspect
+
+2
+assess
+judge
+
+3
+study
+research
+
+4
+Shapley values
+SHaP values
+Shap values
+
+5
+identify
+discern
+distinquish
+
+6
+net (muntligt?)
+network (egt?)
+
+7
+use
+utilise
+
+8
+have
+yield
+produce
+output
+
+9
+predict
+anticipate
+forecast
+
+10
+
+
+
+
+
+
+Tal
+4 eller four
+20 eller twenty
+RQ2 eller research question two (eller 2)
+
+
+Introduktion
+Vad hela grejen handlar om, dess bakgrund och varför det betyder något för världen. Research goal och questions.
+
+Background
+Det teoretiska fundamentet som hela grejen bygger på. Vad för kunnskap som ligger till grund för studien.
+
+Method
+Metode delen skal være her du beskriver hva som må bli gjort for å få samme resultater som deg, noe folk kan replikere. Det ikke så viktig å vite at du startet med.
+
+Results
+Vilka resultat som kom från metod-delen. (andra borde få samma resultat)
+
+Discussion
+Vad resultaten innebär, hur dom kunde varit annorlunda o varför, felkällor.
+
+Conclusion
+
+Future Work

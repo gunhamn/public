@@ -62,18 +62,19 @@ class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
         super(neural_network, self).__init__()
         print(f"Action space: {action_space_n}")
-        print(f"Observation space: {len(observation_space_n)}")
-        print(f"Observation space[0]: {len(observation_space_n[0])}")
+        # Action space: 4
         channels = 3
-        size = len(observation_space_n) # size 8
-        
+        size = len(observation_space_n)
+        print(f"Size: {size}")
+        # Size: 6
         # Define the convolutional layers
         self.conv1 = nn.Conv2d(size, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
         
         self.flattened_size = 32 * size * channels
-        
+        print(f"Flattened size: {self.flattened_size}")
+        # Flattened size: 576
         self.fc1 = nn.Linear(self.flattened_size, 128)
         self.fc2 = nn.Linear(128, action_space_n)
 
