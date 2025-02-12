@@ -1,9 +1,9 @@
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
+import pandas as pd
 import math
 from collections import deque
 import time
@@ -11,53 +11,8 @@ from datetime import datetime
 import random
 import wandb
 
-from ChestWorld import ChestWorld
+from WallWorld import WallWorld
 
-# A DQN is a RL-agent that takes action in an enviroment where it at some point gains rewards from the environment.
-# D stands for Deep as in Deep Learning, which means that the algorithm uses a neural network to approximate q-values
-# Q-values is the approximated value of a state, and every timestep the agent either performs the action
-# with the highest approximated q-values, or a random action with the probabilty epsilon.
-# Epsilon often start close to 1 and end up around 0,05. Meaning that the trained agent still performs
-# random actions every 20th timestep, since it should keep its epsilon also in the deployment environment.
-
-# A DQN uses 2 networks. They are called a target and a policy network. The policy network is updated every timestep
-# while the target network is only copied from the policy network every perhaps 1000nd timestep. Having these 2 networks
-# instead of one increases the algorithms stability.
-# When updating the policy network, the algorithm takes in a big batch of so-called transitions. A transition is an
-# tuple with (state, action, next_state, reward) where, in Gym, state and next_state are (observation, reward, terminated, True, info).
-# Every gamestep the agent has seen is stored in its buffer of transitions.
-# It has a big buffer size that removes the oldest transitions continously when its reaches its max size.
-# A rndomly sampled batch of transitions are used to train the policy network every timestep.
-
-# The q-value is calculated by the bellman equation
-
-# Q(s, a) = r + discountFactor * max[Q(s', a')]
-
-# Where:
-# Q(s, a) - Q-value for s, a - state, action
-# r - reward
-# discountFactor, a float like 0.95
-# max[Q(s', a')] the maximum q-value for all actions a' in the next state 's
-
-# Meaning, no reward now but a win with reward 1 after 7 actions yields
-# Q(s, a) = 0 + 0.95^7 * 1 = 0.698
-
-
-
-
-"""
-Components
-
-Replay buffer
-Neural net
-Epsilon greedy
-Agent
-    Init
-    Train
-    Optimise
-    Inference
-
-"""
 class neural_network(torch.nn.Module):
     def __init__(self, observation_space_n, action_space_n):
         super(neural_network, self).__init__()
@@ -135,7 +90,7 @@ class DqnAgent:
             truncated = False
             try:
                 while not terminated and not truncated:
-                    if self.steps_done in [int(x*max_steps) for x in [0.01, 0.1, 0.5, 0.99]]: # print percentages
+                    if self.steps_done in [int(x*max_steps) for x in [0.01, 0.1, 0.2, 0.5, 0.75, 0.99]]: # print percentages
                         self.printProgress(timeStart, round(self.steps_done/max_steps, 2))
 
                     epsilon = fixedEpsilon or self.epsilon_exp_decay(max_steps)
@@ -216,7 +171,55 @@ class DqnAgent:
     
     def inference(self, env, max_steps=1_000_000, epsilon=0.05, renderQvalues=False):
         self.train(env, max_steps, train=False, fixedEpsilon=epsilon, renderQvalues=renderQvalues)
+    
+    def createDataset(self, env, num_episodes=100):
+        df = pd.DataFrame(columns=["target", 
+                          "agentX", "agentY",
+                          "redX", "redY",
+                          "greenX", "greenY"] + 
+                          [f'a{i}' for i in range(1, 129)])
         
+        activations = {}
+        def get_activation(name):
+            def hook(model, input, output):
+                activations[name] = output.detach()
+            return hook
+
+        # Register hook on the second last layer (fc1)
+        hook = self.policy_net.fc1.register_forward_hook(get_activation('fc1'))
+
+        for e in range(num_episodes):
+            state, _ = env.reset()
+            agentX, agentY = env.agentCoordinates
+            redX, redY = env.redChestCoordinates[0]
+            greenX, greenY = env.greenChestCoordinates[0]
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            terminated = False
+            truncated = False
+
+            # Take 1 step to get the activations
+            action = self.policy_net(state).max(1)[1].view(1, 1)
+            next_state, reward, terminated, truncated, _ = env.step(action.item())
+            reward = torch.tensor([reward], device=self.device)
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = next_state
+            activationData = activations['fc1'].cpu().numpy()[0].flatten()
+
+            while not terminated and not truncated:
+                action = self.policy_net(state).max(1)[1].view(1, 1)
+                next_state, reward, terminated, truncated, _ = env.step(action.item())
+                reward = torch.tensor([reward], device=self.device)
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                state = next_state
+            if terminated:
+                target = reward.item()          # 1 reward ---> green chest
+            else:                               # -1 reward ---> red chest
+                target = 0                      # 0 truncated --> no chest
+            df.loc[e] = [target, agentX, agentY, redX, redY, greenX, greenY] + list(activationData)
+            # Remove the hook when finished
+            hook.remove()
+        return df
+
     def predict(self, state):
         with torch.no_grad():
             return self.policy_net(state)
@@ -267,21 +270,30 @@ class DqnAgent:
 if __name__ == "__main__":
 
     # Config
-    max_steps=1000_000
+    max_steps=700_000
 
-    # ChestWorld
+    # WallWorld
     render_mode=None
     size=7
     agentSpawn = None
     maxSteps=200
-    stepLoss=-1/maxSteps # min reward should be -1
-    wallCoordinates=np.array([[3, 0],[3, 1],[3, 2],     [3, 4],[3, 5],[3, 6],])
+    stepLoss=0
+    chestSpawnCoordinates=np.array([[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6],
+                                    [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6],
+                                    [2, 0], [2, 1], [2, 2],         [2, 4], [2, 5], [2, 6]])
+    wallCoordinates=      np.array([[3, 0], [3, 1], [3, 2],         [3, 4], [3, 5], [3, 6],])
+    agentSpawnCoordinates=np.array([[4, 0],                                         [4, 6],
+                                    [5, 0],                                         [5, 6],
+                                    [6, 0],                                         [6, 6]])
     randomWalls=0
-    chestCoordinates=None
+    redChestCoordinates=None
+    greenChestCoordinates=None
     keyCoordinates=None
-    randomchests=1
+    randomredChests=1
+    randomgreenChests=1
     randomkeys=0
-    chestReward=1
+    redChestReward=0
+    greenChestReward=1
     
     # Agent
     batch_size=64
@@ -293,16 +305,17 @@ if __name__ == "__main__":
     tau=0.0005 # Was 0.005
     replayBuffer=100_000
 
-    model_name = f"CW_{randomchests}chests_{randomkeys}keys_{randomWalls}walls_{size}x{size}_{max_steps}steps"
+    model_name = f"WW_redReward{redChestReward}_grReward{greenChestReward}_{size}x{size}_{max_steps}steps"
 
     useWandb = False
-    saveModel = False
+    saveModel = True
 
     if useWandb:
         wandb.init(project=model_name,
             config={
             "size": size,
-            "goalReward": chestReward,
+            "redChestReward": redChestReward,
+            "greenChestReward": greenChestReward,
             "stepLoss": stepLoss,
             "maxSteps": maxSteps,
             "batch_size": batch_size,
@@ -315,7 +328,21 @@ if __name__ == "__main__":
     else:
         wandb = False
 
-    env = ChestWorld(render_mode=None, size=size, agentSpawn=agentSpawn, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
+    env = WallWorld(render_mode=None,
+                    size=size, agentSpawn=agentSpawn,
+                    stepLoss=stepLoss, maxSteps=maxSteps,
+                    wallCoordinates=wallCoordinates,
+                    randomWalls=randomWalls,
+                    redChestCoordinates=redChestCoordinates,
+                    greenChestCoordinates=greenChestCoordinates,
+                    keyCoordinates=keyCoordinates,
+                    redChestReward=redChestReward,
+                    greenChestReward=greenChestReward,
+                    randomredChests=randomredChests,
+                    randomgreenChests=randomgreenChests,
+                    randomkeys=randomkeys,
+                    agentSpawnCoordinates=agentSpawnCoordinates,
+                    chestSpawnCoordinates=chestSpawnCoordinates)
     observation, _ = env.reset()
     agent = DqnAgent(env.action_space, observation,
         batch_size=batch_size,
@@ -331,14 +358,27 @@ if __name__ == "__main__":
     #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
     print(f"First observation:\n {observation}")
     print(f"First observation.shape: {observation.shape}")
-    #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/modelsToEval/CW_3chests_5keys_6x6_10000000steps.pth")
     print(f"q values: {agent.getQvalues(env)}")
     print(f"q value actions: {agent.getQvalueActions(env)}")
     # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
     agent.train(env=env, max_steps=max_steps)
     if saveModel:
-        agent.save_model_weights(f"C:/Projects/public/XAI_NTNU/models/{model_name}.pth")
+        agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/{model_name}.pth")
     maxSteps = 30
-    show_env = ChestWorld(render_mode="human", size=size, agentSpawn=agentSpawn, stepLoss=stepLoss, maxSteps=maxSteps, wallCoordinates=wallCoordinates, randomWalls=randomWalls, chestCoordinates=chestCoordinates, keyCoordinates=keyCoordinates, chestReward=chestReward, randomchests=randomchests, randomkeys=randomkeys)
+    show_env = WallWorld(render_mode="human",
+                    size=size, agentSpawn=agentSpawn,
+                    stepLoss=stepLoss, maxSteps=maxSteps,
+                    wallCoordinates=wallCoordinates,
+                    randomWalls=randomWalls,
+                    redChestCoordinates=redChestCoordinates,
+                    greenChestCoordinates=greenChestCoordinates,
+                    keyCoordinates=keyCoordinates,
+                    redChestReward=redChestReward,
+                    greenChestReward=greenChestReward,
+                    randomredChests=randomredChests,
+                    randomgreenChests=randomgreenChests,
+                    randomkeys=randomkeys,
+                    agentSpawnCoordinates=agentSpawnCoordinates,
+                    chestSpawnCoordinates=chestSpawnCoordinates)
     agent.wandb = False
-    agent.inference(env=show_env, max_steps=1000, epsilon=epsilon_min, renderQvalues=False)
+    agent.inference(env=show_env, max_steps=100, epsilon=epsilon_min, renderQvalues=False)
