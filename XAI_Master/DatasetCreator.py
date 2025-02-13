@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
+import shap
 
 from WallWorld import WallWorld
 from DqnAgent import DqnAgent
@@ -91,8 +92,16 @@ if __name__ == "__main__":
                     chestSpawnCoordinates=chestSpawnCoordinates)
     
     agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/WW_redReward1_grReward0_7x7_700000steps.pth")
-    #agent.inference(env=show_env, max_steps=100, epsilon=epsilon_min, renderQvalues=False)
-    
+    """
+    print("Create dataset")
+    df = agent.createActivationDataset(env, num_episodes=5000)
+    print(df)
+
+    df.to_csv(f"C:/Projects/public/XAI_Master/datasets/red1green0.csv", 
+          index=False,          # No index as column
+          float_format='%.8f'   # Round to 8 decimals
+         )
+    """
     # First define the hook and dictionary to store activations
     activations = {}
     def get_activation(name):
@@ -106,49 +115,43 @@ if __name__ == "__main__":
     # Your existing code
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
-    action = agent.policy_net(state).max(1)[1].view(1, 1)
-    redChestCoordinates = env.redChestCoordinates
-    greenChestCoordinates = env.greenChestCoordinates
-    agentLoc = env.agentCoordinates
 
-    # Print the activations (this will show
-    # all values before the max operation)
-    print("Last layer activations:", activations['fc1'])
+    def createUncoloredState(state):
+        uncolored_state = state.clone()
+        height, width = state.shape[1:3]
+        for i in range(height):
+            for j in range(width):
+                # Check if the cell has any non-zero values
+                if torch.any(state[0][i][j] > 0):
+                    # Set to white using tensor values
+                    uncolored_state[0][i][j][:] = 1.0
+        return uncolored_state
+    print(f"Uncolored state: {createUncoloredState(state)}")
 
-    activationData = activations['fc1'].cpu().numpy()[0].flatten()
-    stateData = state.cpu().numpy()[0].flatten()
+    backgroundState = createUncoloredState(state)
+    agent.createShapDataset(env, num_episodes=1)
 
-    print(f"Activation data: {activationData}")
-    print(f"State data: {stateData}")
-    # print len
-    print(f"Activation data len: {len(activationData)}")
-    print(f"State data len: {len(stateData)}")
-    print(f"Red chest coordinates: {redChestCoordinates}")
-    print(f"Red chest x coordinate: {redChestCoordinates[0][0]}")
-    print(f"Red chest y coordinate: {redChestCoordinates[0][1]}")
+    print(f"Background state shape: {backgroundState.shape}")
+    print(f"State shape: {state.shape}")
+
+    shap_values = shap.GradientExplainer(agent.policy_net, backgroundState, batch_size=50).shap_values(state)
+    #print(f"Shap values: {shap_values}")
+    #shap.image_plot(shap_values, state.numpy())
+
     
-    print(f"Green chest coordinates: {greenChestCoordinates}")
-    print(f"Agent coordinates: {agentLoc}")
+    action_direction = {0: "Right",1: "Down",2: "Left", 3: "Up"}
 
-    # Remove the hook when finished
-    hook.remove()
-    print(f"Action: {action}")
-    print(agent.policy_net)
+    for action_idx in range(4):
+        action_shap_values = np.array([s[:,:,:,action_idx] for s in shap_values])
+        shap.image_plot(action_shap_values, state.numpy())
+        
 
-    print("Create dataset")
-    df = agent.createDataset(env, num_episodes=5000)
-    print(df)
+    #shap_numpy = list(np.transpose(shap_values, (4, 0, 2, 1, 3)))
+    #test_numpy = np.transpose(statesToExplain.numpy(), (0, 2, 1, 3))
 
-    df.to_csv(f"C:/Projects/public/XAI_Master/datasets/red1green0.csv", 
-          index=False,          # No index as column
-          float_format='%.8f'   # Round to 8 decimals
-         )
+    #labels = np.array(["Right", "Down", "Left", "Up"])
 
-
-"""Todo for tomorrow:
-Create a complete create dataset function
-where each row contains the state, activations and result.
-Since there are almost 200 features, 2 training sets with
-5000 samples each should be created, then mixed, then saving
-5% for testing. Then a ipynb file should be created that uses
-these csv files to predict outcome."""
+    # plot the feature attributions
+    #shap.image_plot(shap_values=shap_numpy,
+    #                pixel_values=test_numpy,
+    #                labels=labels)

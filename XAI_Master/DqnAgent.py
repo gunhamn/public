@@ -172,19 +172,17 @@ class DqnAgent:
     def inference(self, env, max_steps=1_000_000, epsilon=0.05, renderQvalues=False):
         self.train(env, max_steps, train=False, fixedEpsilon=epsilon, renderQvalues=renderQvalues)
     
-    def createDataset(self, env, num_episodes=100):
+    def createActivationDataset(self, env, num_episodes=100):
         df = pd.DataFrame(columns=["target", 
                           "agentX", "agentY",
                           "redX", "redY",
                           "greenX", "greenY"] + 
                           [f'a{i}' for i in range(1, 129)])
-        
         activations = {}
         def get_activation(name):
             def hook(model, input, output):
                 activations[name] = output.detach()
             return hook
-
         # Register hook on the second last layer (fc1)
         hook = self.policy_net.fc1.register_forward_hook(get_activation('fc1'))
 
@@ -219,6 +217,16 @@ class DqnAgent:
             # Remove the hook when finished
             hook.remove()
         return df
+    
+    def createShapDataset(self, env, num_episodes=100):
+        state, _ = env.reset()
+        print(f"State: {state}")
+        df = pd.DataFrame(columns=[f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']])
+        df.loc[0] = state.flatten()
+        print(f"Dataframe: {df}")
+
+
+
 
     def predict(self, state):
         with torch.no_grad():
