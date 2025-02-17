@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 import random
 import wandb
+import shap
 
 from WallWorld import WallWorld
 
@@ -214,18 +215,44 @@ class DqnAgent:
             else:                               # -1 reward ---> red chest
                 target = 0                      # 0 truncated --> no chest
             df.loc[e] = [target, agentX, agentY, redX, redY, greenX, greenY] + list(activationData)
-            # Remove the hook when finished
-            hook.remove()
+        hook.remove()
         return df
     
+    def createUncoloredState(self, state):
+        uncolored_state = state.clone()
+        height, width = state.shape[1:3]
+        for i in range(height):
+            for j in range(width):
+                # Check if the cell has any non-zero values
+                if torch.any(state[0][i][j] > 0):
+                    # Set to white using tensor values
+                    uncolored_state[0][i][j][:] = 1.0
+        return uncolored_state
+
     def createShapDataset(self, env, num_episodes=100):
         state, _ = env.reset()
+        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        action = self.policy_net(state).max(1)[1].view(1, 1)
+        backgroundState = self.createUncoloredState(state)
+        shap_values = shap.GradientExplainer(self.policy_net, backgroundState, batch_size=50).shap_values(state)
+        action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
+        """
         print(f"State: {state}")
-        df = pd.DataFrame(columns=[f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']])
-        df.loc[0] = state.flatten()
+        print(f"Action shap values: {action_shap_values}")
+        print(f"State flattened: {state.flatten()}")
+        print(f"Action shap values flattened: {action_shap_values.flatten()}")
+        print(f"State flattened shape: {state.flatten().shape}")
+        print(f"Action shap values flattened shape: {action_shap_values.flatten().shape}")
+        """
+
+        df = pd.DataFrame(columns=[f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                          + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']])
+
+        # Combine and assign
+        df.loc[0] = np.concatenate([state.flatten().detach().numpy(), action_shap_values.flatten()])
+
+        print(f"Dataframe: {df.columns}")
         print(f"Dataframe: {df}")
-
-
 
 
     def predict(self, state):
@@ -278,7 +305,7 @@ class DqnAgent:
 if __name__ == "__main__":
 
     # Config
-    max_steps=700_000
+    max_steps=1200_000
 
     # WallWorld
     render_mode=None
@@ -337,20 +364,20 @@ if __name__ == "__main__":
         wandb = False
 
     env = WallWorld(render_mode=None,
-                    size=size, agentSpawn=agentSpawn,
-                    stepLoss=stepLoss, maxSteps=maxSteps,
-                    wallCoordinates=wallCoordinates,
-                    randomWalls=randomWalls,
-                    redChestCoordinates=redChestCoordinates,
-                    greenChestCoordinates=greenChestCoordinates,
-                    keyCoordinates=keyCoordinates,
-                    redChestReward=redChestReward,
-                    greenChestReward=greenChestReward,
-                    randomredChests=randomredChests,
-                    randomgreenChests=randomgreenChests,
-                    randomkeys=randomkeys,
-                    agentSpawnCoordinates=agentSpawnCoordinates,
-                    chestSpawnCoordinates=chestSpawnCoordinates)
+        size=size, agentSpawn=agentSpawn,
+        stepLoss=stepLoss, maxSteps=maxSteps,
+        wallCoordinates=wallCoordinates,
+        randomWalls=randomWalls,
+        redChestCoordinates=redChestCoordinates,
+        greenChestCoordinates=greenChestCoordinates,
+        keyCoordinates=keyCoordinates,
+        redChestReward=redChestReward,
+        greenChestReward=greenChestReward,
+        randomredChests=randomredChests,
+        randomgreenChests=randomgreenChests,
+        randomkeys=randomkeys,
+        agentSpawnCoordinates=agentSpawnCoordinates,
+        chestSpawnCoordinates=chestSpawnCoordinates)
     observation, _ = env.reset()
     agent = DqnAgent(env.action_space, observation,
         batch_size=batch_size,
@@ -374,19 +401,19 @@ if __name__ == "__main__":
         agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/{model_name}.pth")
     maxSteps = 30
     show_env = WallWorld(render_mode="human",
-                    size=size, agentSpawn=agentSpawn,
-                    stepLoss=stepLoss, maxSteps=maxSteps,
-                    wallCoordinates=wallCoordinates,
-                    randomWalls=randomWalls,
-                    redChestCoordinates=redChestCoordinates,
-                    greenChestCoordinates=greenChestCoordinates,
-                    keyCoordinates=keyCoordinates,
-                    redChestReward=redChestReward,
-                    greenChestReward=greenChestReward,
-                    randomredChests=randomredChests,
-                    randomgreenChests=randomgreenChests,
-                    randomkeys=randomkeys,
-                    agentSpawnCoordinates=agentSpawnCoordinates,
-                    chestSpawnCoordinates=chestSpawnCoordinates)
+        size=size, agentSpawn=agentSpawn,
+        stepLoss=stepLoss, maxSteps=maxSteps,
+        wallCoordinates=wallCoordinates,
+        randomWalls=randomWalls,
+        redChestCoordinates=redChestCoordinates,
+        greenChestCoordinates=greenChestCoordinates,
+        keyCoordinates=keyCoordinates,
+        redChestReward=redChestReward,
+        greenChestReward=greenChestReward,
+        randomredChests=randomredChests,
+        randomgreenChests=randomgreenChests,
+        randomkeys=randomkeys,
+        agentSpawnCoordinates=agentSpawnCoordinates,
+        chestSpawnCoordinates=chestSpawnCoordinates)
     agent.wandb = False
-    agent.inference(env=show_env, max_steps=100, epsilon=epsilon_min, renderQvalues=False)
+    agent.inference(env=show_env, max_steps=10000, epsilon=epsilon_min, renderQvalues=False)

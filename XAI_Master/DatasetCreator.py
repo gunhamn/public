@@ -91,16 +91,24 @@ if __name__ == "__main__":
                     agentSpawnCoordinates=agentSpawnCoordinates,
                     chestSpawnCoordinates=chestSpawnCoordinates)
     
-    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/WW_redReward1_grReward0_7x7_700000steps.pth")
-    """
-    print("Create dataset")
-    df = agent.createActivationDataset(env, num_episodes=5000)
-    print(df)
+    modelName = "WW_redReward0_grReward1_7x7_1500000steps"
+    modelNames = ["WW_redReward0_grReward1_7x7_300000steps",
+                  "WW_redReward0_grReward1_7x7_1500000steps",
+                  "WW_redReward1_grReward0_7x7_700000steps",
+                  "WW_redReward1_grReward0_7x7_1500000steps",
+                  "WW_redReward1_grReward0_7x7_2000000steps"]
+    for modelName in modelNames:
+        agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
+        print(f"Creating dataset for {modelName}")
+        df = agent.createActivationDataset(env, num_episodes=10000)
+        print(df)
 
-    df.to_csv(f"C:/Projects/public/XAI_Master/datasets/red1green0.csv", 
-          index=False,          # No index as column
-          float_format='%.8f'   # Round to 8 decimals
-         )
+        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/{modelName}.csv", 
+            index=False,          # No index as column
+            float_format='%.8f'   # Round to 8 decimals
+            )
+        print(f"Dataset saved for {modelName}")
+    """
     """
     # First define the hook and dictionary to store activations
     activations = {}
@@ -115,6 +123,7 @@ if __name__ == "__main__":
     # Your existing code
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
+    action = agent.policy_net(state).max(1)[1].view(1, 1)
 
     def createUncoloredState(state):
         uncolored_state = state.clone()
@@ -126,13 +135,13 @@ if __name__ == "__main__":
                     # Set to white using tensor values
                     uncolored_state[0][i][j][:] = 1.0
         return uncolored_state
-    print(f"Uncolored state: {createUncoloredState(state)}")
+    #print(f"Uncolored state: {createUncoloredState(state)}")
 
     backgroundState = createUncoloredState(state)
     agent.createShapDataset(env, num_episodes=1)
 
-    print(f"Background state shape: {backgroundState.shape}")
-    print(f"State shape: {state.shape}")
+    #print(f"Background state shape: {backgroundState.shape}")
+    #print(f"State shape: {state.shape}")
 
     shap_values = shap.GradientExplainer(agent.policy_net, backgroundState, batch_size=50).shap_values(state)
     #print(f"Shap values: {shap_values}")
@@ -140,12 +149,14 @@ if __name__ == "__main__":
 
     
     action_direction = {0: "Right",1: "Down",2: "Left", 3: "Up"}
+    #print(f"Action: {action.item()}")
 
-    for action_idx in range(4):
-        action_shap_values = np.array([s[:,:,:,action_idx] for s in shap_values])
-        shap.image_plot(action_shap_values, state.numpy())
-        
-
+    #for action_idx in range(4):
+    #    action_shap_values = np.array([s[:,:,:,action_idx] for s in shap_values])
+    #    shap.image_plot(action_shap_values, state.numpy())
+    
+    action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
+    #print(f"Action shap values: {action_shap_values}")
     #shap_numpy = list(np.transpose(shap_values, (4, 0, 2, 1, 3)))
     #test_numpy = np.transpose(statesToExplain.numpy(), (0, 2, 1, 3))
 
