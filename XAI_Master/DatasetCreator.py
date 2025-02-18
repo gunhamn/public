@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 import shap
+import time
 
 from WallWorld import WallWorld
 from DqnAgent import DqnAgent
@@ -91,12 +92,13 @@ if __name__ == "__main__":
                     agentSpawnCoordinates=agentSpawnCoordinates,
                     chestSpawnCoordinates=chestSpawnCoordinates)
     
-    modelName = "WW_redReward0_grReward1_7x7_1500000steps"
     modelNames = ["WW_redReward0_grReward1_7x7_300000steps",
                   "WW_redReward0_grReward1_7x7_1500000steps",
                   "WW_redReward1_grReward0_7x7_700000steps",
                   "WW_redReward1_grReward0_7x7_1500000steps",
                   "WW_redReward1_grReward0_7x7_2000000steps"]
+    
+    """
     for modelName in modelNames:
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
         print(f"Creating dataset for {modelName}")
@@ -110,17 +112,6 @@ if __name__ == "__main__":
         print(f"Dataset saved for {modelName}")
     """
     """
-    # First define the hook and dictionary to store activations
-    activations = {}
-    def get_activation(name):
-        def hook(model, input, output):
-            activations[name] = output.detach()
-        return hook
-
-    # Register hook on the last layer (fc2)
-    hook = agent.policy_net.fc1.register_forward_hook(get_activation('fc1'))
-
-    # Your existing code
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
     action = agent.policy_net(state).max(1)[1].view(1, 1)
@@ -135,34 +126,20 @@ if __name__ == "__main__":
                     # Set to white using tensor values
                     uncolored_state[0][i][j][:] = 1.0
         return uncolored_state
-    #print(f"Uncolored state: {createUncoloredState(state)}")
 
     backgroundState = createUncoloredState(state)
-    agent.createShapDataset(env, num_episodes=1)
-
-    #print(f"Background state shape: {backgroundState.shape}")
-    #print(f"State shape: {state.shape}")
-
     shap_values = shap.GradientExplainer(agent.policy_net, backgroundState, batch_size=50).shap_values(state)
-    #print(f"Shap values: {shap_values}")
-    #shap.image_plot(shap_values, state.numpy())
+    shap.image_plot(shap_values, state.numpy())
 
-    
-    action_direction = {0: "Right",1: "Down",2: "Left", 3: "Up"}
-    #print(f"Action: {action.item()}")
-
-    #for action_idx in range(4):
-    #    action_shap_values = np.array([s[:,:,:,action_idx] for s in shap_values])
-    #    shap.image_plot(action_shap_values, state.numpy())
-    
-    action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
-    #print(f"Action shap values: {action_shap_values}")
-    #shap_numpy = list(np.transpose(shap_values, (4, 0, 2, 1, 3)))
-    #test_numpy = np.transpose(statesToExplain.numpy(), (0, 2, 1, 3))
-
-    #labels = np.array(["Right", "Down", "Left", "Up"])
-
-    # plot the feature attributions
-    #shap.image_plot(shap_values=shap_numpy,
-    #                pixel_values=test_numpy,
-    #                labels=labels)
+    """
+    #modelName = "WW_redReward0_grReward1_7x7_1500000steps"
+    timeStart = time.time()
+    for modelName, percent in zip(modelNames, [0.2, 0.4, 0.6, 0.8, 1]):
+        print(f"Creating dataset for {modelName}")
+        agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
+        df = agent.createShapDataset(env, num_episodes=1000)
+        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_{modelName}.csv", 
+                index=False)# No index as column
+                # float_format='%.8f')   # Round to 8 decimals
+        agent.printProgress(timeStart, percent=percent)
+    print("Complete")

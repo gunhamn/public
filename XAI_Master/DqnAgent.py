@@ -173,7 +173,7 @@ class DqnAgent:
     def inference(self, env, max_steps=1_000_000, epsilon=0.05, renderQvalues=False):
         self.train(env, max_steps, train=False, fixedEpsilon=epsilon, renderQvalues=renderQvalues)
     
-    def createActivationDataset(self, env, num_episodes=100):
+    def createActivationDataset(self, env, num_episodes=100, epsilon=0.05):
         df = pd.DataFrame(columns=["target", 
                           "agentX", "agentY",
                           "redX", "redY",
@@ -205,7 +205,11 @@ class DqnAgent:
             activationData = activations['fc1'].cpu().numpy()[0].flatten()
 
             while not terminated and not truncated:
-                action = self.policy_net(state).max(1)[1].view(1, 1)
+                if np.random.rand() < epsilon:
+                    action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
+                else:
+                    with torch.no_grad():
+                        action = self.policy_net(state).max(1)[1].view(1, 1)
                 next_state, reward, terminated, truncated, _ = env.step(action.item())
                 reward = torch.tensor([reward], device=self.device)
                 next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -229,30 +233,48 @@ class DqnAgent:
                     uncolored_state[0][i][j][:] = 1.0
         return uncolored_state
 
-    def createShapDataset(self, env, num_episodes=100):
+    def createShapDataset(self, env, num_episodes=100, epsilon=0.05):
+        
         state, _ = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-        action = self.policy_net(state).max(1)[1].view(1, 1)
         backgroundState = self.createUncoloredState(state)
-        shap_values = shap.GradientExplainer(self.policy_net, backgroundState, batch_size=50).shap_values(state)
-        action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
-        """
-        print(f"State: {state}")
-        print(f"Action shap values: {action_shap_values}")
-        print(f"State flattened: {state.flatten()}")
-        print(f"Action shap values flattened: {action_shap_values.flatten()}")
-        print(f"State flattened shape: {state.flatten().shape}")
-        print(f"Action shap values flattened shape: {action_shap_values.flatten().shape}")
-        """
+        df = pd.DataFrame(columns=["target"]
+                        + [f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']])
+        
+        for e in range(num_episodes):
+            state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            action = self.policy_net(state).max(1)[1].view(1, 1)
+            shap_values = shap.GradientExplainer(self.policy_net, backgroundState, batch_size=1).shap_values(state)
+            action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
 
-        df = pd.DataFrame(columns=[f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
-                          + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']])
+            terminated = False
+            truncated = False
 
-        # Combine and assign
-        df.loc[0] = np.concatenate([state.flatten().detach().numpy(), action_shap_values.flatten()])
+            next_state, reward, terminated, truncated, _ = env.step(action.item())
+            reward = torch.tensor([reward], device=self.device)
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = next_state
 
-        print(f"Dataframe: {df.columns}")
-        print(f"Dataframe: {df}")
+            while not terminated and not truncated:
+                if np.random.rand() < epsilon:
+                    action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
+                else:
+                    with torch.no_grad():
+                        action = self.policy_net(state).max(1)[1].view(1, 1)
+                next_state, reward, terminated, truncated, _ = env.step(action.item())
+                reward = torch.tensor([reward], device=self.device)
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                state = next_state
+            if terminated:
+                target = reward.item()          # 1 reward ---> green chest
+            else:                               # -1 reward ---> red chest
+                target = 0                      # 0 truncated --> no chest
+            #df.loc[e] = [target, agentX, agentY, redX, redY, greenX, greenY] + list(activationData)
+
+            df.loc[e] = [target] + list(state.flatten().detach().numpy()) + list(action_shap_values.flatten())
+        return df
 
 
     def predict(self, state):
@@ -304,101 +326,127 @@ class DqnAgent:
 
 if __name__ == "__main__":
 
-    # Config
-    max_steps=1200_000
-
-    # WallWorld
-    render_mode=None
-    size=7
-    agentSpawn = None
-    maxSteps=200
-    stepLoss=0
-    chestSpawnCoordinates=np.array([[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6],
-                                    [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6],
-                                    [2, 0], [2, 1], [2, 2],         [2, 4], [2, 5], [2, 6]])
-    wallCoordinates=      np.array([[3, 0], [3, 1], [3, 2],         [3, 4], [3, 5], [3, 6],])
-    agentSpawnCoordinates=np.array([[4, 0],                                         [4, 6],
-                                    [5, 0],                                         [5, 6],
-                                    [6, 0],                                         [6, 6]])
-    randomWalls=0
-    redChestCoordinates=None
-    greenChestCoordinates=None
-    keyCoordinates=None
-    randomredChests=1
-    randomgreenChests=1
-    randomkeys=0
-    redChestReward=0
-    greenChestReward=1
+    rewardCombinations = [[0.0, 1],
+               [0.1, 1],
+               [0.2, 1],
+               [0.3, 1],
+               [0.4, 1],
+               [0.5, 1],
+               [0.6, 1],
+               [0.7, 1],
+               [0.8, 1],
+               [0.9, 1],
+               [1, 1],
+               [1, 0.9],
+               [1, 0.8],
+               [1, 0.7],
+               [1, 0.6],
+               [1, 0.5],
+               [1, 0.4],
+               [1, 0.3],
+               [1, 0.2],
+               [1, 0.1],
+               [1, 0.0]]
     
-    # Agent
-    batch_size=64
-    lr=0.001
-    gamma=0.95
-    epsilon_start=1
-    epsilon_min=0.05
-    epsilon_decay=200_000 # 50_000 at 3000 episodes
-    tau=0.0005 # Was 0.005
-    replayBuffer=100_000
+    test_rewardCombinations = [[0.0, 1]]
 
-    model_name = f"WW_redReward{redChestReward}_grReward{greenChestReward}_{size}x{size}_{max_steps}steps"
+    for rewardCombination in test_rewardCombinations:
+        print(f"Reward combination: {rewardCombination}")
+        print(f"Reward combination[0]: {rewardCombination[0]}")
+        print(f"Reward combination[1]: {rewardCombination[1]}")
+        # Config
+        max_steps=1_500_000
 
-    useWandb = False
-    saveModel = True
+        # WallWorld
+        render_mode=None
+        size=7
+        agentSpawn = None
+        maxSteps=200
+        stepLoss=0
+        chestSpawnCoordinates=np.array([[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6],
+                                        [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6],
+                                        [2, 0], [2, 1], [2, 2],         [2, 4], [2, 5], [2, 6]])
+        wallCoordinates=      np.array([[3, 0], [3, 1], [3, 2],         [3, 4], [3, 5], [3, 6],])
+        agentSpawnCoordinates=np.array([[4, 0],                                         [4, 6],
+                                        [5, 0],                                         [5, 6],
+                                        [6, 0],                                         [6, 6]])
+        randomWalls=0
+        redChestCoordinates=None
+        greenChestCoordinates=None
+        keyCoordinates=None
+        randomredChests=1
+        randomgreenChests=1
+        randomkeys=0
+        redChestReward=rewardCombination[0] # Change this later
+        greenChestReward=rewardCombination[1] # Change this later
+        
+        # Agent
+        batch_size=64
+        lr=0.001
+        gamma=0.95
+        epsilon_start=1
+        epsilon_min=0.05
+        epsilon_decay=200_000 # 50_000 at 3000 episodes
+        tau=0.0005 # Was 0.005
+        replayBuffer=100_000
 
-    if useWandb:
-        wandb.init(project=model_name,
-            config={
-            "size": size,
-            "redChestReward": redChestReward,
-            "greenChestReward": greenChestReward,
-            "stepLoss": stepLoss,
-            "maxSteps": maxSteps,
-            "batch_size": batch_size,
-            "lr": lr,
-            "gamma": gamma,
-            "epsilon_start": epsilon_start,
-            "epsilon_min": epsilon_min,
-            "epsilon_decay": epsilon_decay,
-            "tau": tau})
-    else:
-        wandb = False
 
-    env = WallWorld(render_mode=None,
-        size=size, agentSpawn=agentSpawn,
-        stepLoss=stepLoss, maxSteps=maxSteps,
-        wallCoordinates=wallCoordinates,
-        randomWalls=randomWalls,
-        redChestCoordinates=redChestCoordinates,
-        greenChestCoordinates=greenChestCoordinates,
-        keyCoordinates=keyCoordinates,
-        redChestReward=redChestReward,
-        greenChestReward=greenChestReward,
-        randomredChests=randomredChests,
-        randomgreenChests=randomgreenChests,
-        randomkeys=randomkeys,
-        agentSpawnCoordinates=agentSpawnCoordinates,
-        chestSpawnCoordinates=chestSpawnCoordinates)
-    observation, _ = env.reset()
-    agent = DqnAgent(env.action_space, observation,
-        batch_size=batch_size,
-        lr=lr,
-        gamma=gamma,
-        epsilon_start=epsilon_start,
-        epsilon_min=epsilon_min,
-        epsilon_decay=epsilon_decay,
-        tau=tau,
-        replayBuffer=replayBuffer,
-        wandb=wandb)
-    
-    #agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/{size}x{size}_{num_episodes}ep.pth")
-    print(f"First observation:\n {observation}")
-    print(f"First observation.shape: {observation.shape}")
-    print(f"q values: {agent.getQvalues(env)}")
-    print(f"q value actions: {agent.getQvalueActions(env)}")
-    # agent.load_model_weights(f"C:/Projects/public/XAI_NTNU/models/2goodCoins0walls8x8_3000ep.pth")
-    agent.train(env=env, max_steps=max_steps)
-    if saveModel:
-        agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/{model_name}.pth")
+        model_name = f"r{str(int(redChestReward * 10)).zfill(2)}_g{str(int(greenChestReward * 10)).zfill(2)}_{max_steps//1000}k"
+
+        useWandb = False
+        saveModel = True
+
+        if useWandb:
+            wandb.init(project=model_name,
+                config={
+                "size": size,
+                "redChestReward": redChestReward,
+                "greenChestReward": greenChestReward,
+                "stepLoss": stepLoss,
+                "maxSteps": maxSteps,
+                "batch_size": batch_size,
+                "lr": lr,
+                "gamma": gamma,
+                "epsilon_start": epsilon_start,
+                "epsilon_min": epsilon_min,
+                "epsilon_decay": epsilon_decay,
+                "tau": tau})
+        else:
+            wandb = False
+
+        env = WallWorld(render_mode=None,
+            size=size, agentSpawn=agentSpawn,
+            stepLoss=stepLoss, maxSteps=maxSteps,
+            wallCoordinates=wallCoordinates,
+            randomWalls=randomWalls,
+            redChestCoordinates=redChestCoordinates,
+            greenChestCoordinates=greenChestCoordinates,
+            keyCoordinates=keyCoordinates,
+            redChestReward=redChestReward,
+            greenChestReward=greenChestReward,
+            randomredChests=randomredChests,
+            randomgreenChests=randomgreenChests,
+            randomkeys=randomkeys,
+            agentSpawnCoordinates=agentSpawnCoordinates,
+            chestSpawnCoordinates=chestSpawnCoordinates)
+        observation, _ = env.reset()
+        agent = DqnAgent(env.action_space, observation,
+            batch_size=batch_size,
+            lr=lr,
+            gamma=gamma,
+            epsilon_start=epsilon_start,
+            epsilon_min=epsilon_min,
+            epsilon_decay=epsilon_decay,
+            tau=tau,
+            replayBuffer=replayBuffer,
+            wandb=wandb)
+        #agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/WW_redReward1_grReward0_7x7_2000000steps.pth")
+        
+        agent.train(env=env, max_steps=max_steps)
+        if saveModel:
+            agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/{model_name}.pth")
+    print("Complete")
+    """
     maxSteps = 30
     show_env = WallWorld(render_mode="human",
         size=size, agentSpawn=agentSpawn,
@@ -417,3 +465,4 @@ if __name__ == "__main__":
         chestSpawnCoordinates=chestSpawnCoordinates)
     agent.wandb = False
     agent.inference(env=show_env, max_steps=10000, epsilon=epsilon_min, renderQvalues=False)
+    """
