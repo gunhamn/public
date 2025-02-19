@@ -350,7 +350,7 @@ if __name__ == "__main__":
     
     test_rewardCombinations = [[0.0, 1]]
 
-    for rewardCombination in test_rewardCombinations:
+    for rewardCombination in rewardCombinations:
         print(f"Reward combination: {rewardCombination}")
         print(f"Reward combination[0]: {rewardCombination[0]}")
         print(f"Reward combination[1]: {rewardCombination[1]}")
