@@ -33,12 +33,13 @@ if __name__ == "__main__":
     randomredChests=1
     randomgreenChests=1
     randomkeys=0
-    redChestReward=-1
-    greenChestReward=1
+    redChestReward=-1 # Don't change this
+    greenChestReward=1 # Don't change this
+    # Explaination:
     # terminated with 1 reward ---> green chest: 1
     # terminated with 0 reward ---> red chest:  -1
     # truncated                 --> no chest:    0
-    
+
     # Agent
     batch_size=64
     lr=0.001
@@ -91,13 +92,34 @@ if __name__ == "__main__":
                     randomkeys=randomkeys,
                     agentSpawnCoordinates=agentSpawnCoordinates,
                     chestSpawnCoordinates=chestSpawnCoordinates)
-    
+    """
     modelNames = ["WW_redReward0_grReward1_7x7_300000steps",
                   "WW_redReward0_grReward1_7x7_1500000steps",
                   "WW_redReward1_grReward0_7x7_700000steps",
                   "WW_redReward1_grReward0_7x7_1500000steps",
                   "WW_redReward1_grReward0_7x7_2000000steps"]
-    
+    """
+    modelNames = ["r00_g10_1500k",
+              "r01_g10_1500k",
+              "r02_g10_1500k",
+              "r03_g10_1500k",
+              "r04_g10_1500k",
+              "r05_g10_1500k",
+              "r06_g10_1500k",
+              "r07_g10_1500k",
+              "r08_g10_1500k",
+              "r09_g10_1500k",
+              "r10_g00_1500k",
+              "r10_g01_1500k",
+              "r10_g02_1500k",
+              "r10_g03_1500k",
+              "r10_g04_1500k",
+              "r10_g05_1500k",
+              "r10_g06_1500k",
+              "r10_g07_1500k",
+              "r10_g08_1500k",
+              "r10_g09_1500k",
+              "r10_g10_1500k"]
     """
     for modelName in modelNames:
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
@@ -134,12 +156,17 @@ if __name__ == "__main__":
     """
     #modelName = "WW_redReward0_grReward1_7x7_1500000steps"
     timeStart = time.time()
-    for modelName, percent in zip(modelNames, [0.2, 0.4, 0.6, 0.8, 1]):
+    for modelName, percent in zip(modelNames, [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
+                                               0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        df = agent.createShapDataset(env, num_episodes=1000)
+        df = agent.createShapDataset(env, num_episodes=2000)
         df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
+        df = agent.createActivationDataset(env, num_episodes=2000)
+        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/act_{modelName}.csv", 
+                index=False)# No index as column
+                # float_format='%.8f')   # Round to 8 decimals
         agent.printProgress(timeStart, percent=percent)
-    print("Complete")
+    print("Complete") # Exp: 5h runtime to shap all 21aaz
