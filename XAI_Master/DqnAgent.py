@@ -171,11 +171,9 @@ class DqnAgent:
         self.train(env, max_steps, train=False, fixedEpsilon=epsilon, renderQvalues=renderQvalues)
     
     def createActivationDataset(self, env, num_episodes=100, epsilon=0.05):
-        df = pd.DataFrame(columns=["target", 
-                          "agentX", "agentY",
-                          "redX", "redY",
-                          "greenX", "greenY"] + 
-                          [f'a{i}' for i in range(1, 129)])
+        df = pd.DataFrame(columns=["target"]
+                        + [f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'a{i}' for i in range(1, 129)])
         activations = {}
         def get_activation(name):
             def hook(model, input, output):
@@ -186,10 +184,11 @@ class DqnAgent:
 
         for e in range(num_episodes):
             state, _ = env.reset()
-            agentX, agentY = env.agentCoordinates
-            redX, redY = env.redChestCoordinates[0]
-            greenX, greenY = env.greenChestCoordinates[0]
+            # agentX, agentY = env.agentCoordinates, old
+            # redX, redY = env.redChestCoordinates[0], old
+            # greenX, greenY = env.greenChestCoordinates[0], old
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state_init = state.clone()
             terminated = False
             truncated = False
 
@@ -215,7 +214,7 @@ class DqnAgent:
                 target = reward.item()          # 1 reward ---> green chest
             else:                               # -1 reward ---> red chest
                 target = 0                      # 0 truncated --> no chest
-            df.loc[e] = [target, agentX, agentY, redX, redY, greenX, greenY] + list(activationData)
+            df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(activationData)
         hook.remove()
         return df
     
@@ -242,6 +241,7 @@ class DqnAgent:
         for e in range(num_episodes):
             state, _ = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state_init = state.clone()
             action = self.policy_net(state).max(1)[1].view(1, 1)
             shap_values = shap.GradientExplainer(self.policy_net, backgroundState, batch_size=1).shap_values(state)
             action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
@@ -270,7 +270,7 @@ class DqnAgent:
                 target = 0                      # 0 truncated --> no chest
             #df.loc[e] = [target, agentX, agentY, redX, redY, greenX, greenY] + list(activationData)
 
-            df.loc[e] = [target] + list(state.flatten().detach().numpy()) + list(action_shap_values.flatten())
+            df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(action_shap_values.flatten())
         return df
 
 
