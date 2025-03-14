@@ -92,13 +92,7 @@ if __name__ == "__main__":
                     randomkeys=randomkeys,
                     agentSpawnCoordinates=agentSpawnCoordinates,
                     chestSpawnCoordinates=chestSpawnCoordinates)
-    """
-    modelNames = ["WW_redReward0_grReward1_7x7_300000steps",
-                  "WW_redReward0_grReward1_7x7_1500000steps",
-                  "WW_redReward1_grReward0_7x7_700000steps",
-                  "WW_redReward1_grReward0_7x7_1500000steps",
-                  "WW_redReward1_grReward0_7x7_2000000steps"]
-    """
+
     modelNames = ["r00_g10_1500k",
               "r01_g10_1500k",
               "r02_g10_1500k",
@@ -120,41 +114,43 @@ if __name__ == "__main__":
               "r10_g08_1500k",
               "r10_g09_1500k",
               "r10_g10_1500k"]
-    """
-    for modelName in modelNames:
-        agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        print(f"Creating dataset for {modelName}")
-        df = agent.createActivationDataset(env, num_episodes=10000)
-        print(df)
+    
+    gamestateDataset = pd.read_csv("C:/Projects/public/XAI_Master/datasets/42000_gamestates.csv")
 
-        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/{modelName}.csv", 
-            index=False,          # No index as column
-            float_format='%.8f'   # Round to 8 decimals
-            )
-        print(f"Dataset saved for {modelName}")
-    """
-    """
+    def plot_image(row):
+        image_values = row.values.reshape(7, 7, 3).transpose((1, 0, 2))
+        plt.imshow(image_values)
+        plt.suptitle(f'Game state')
+        plt.axis('off')
+        plt.show()
+    # plot_image(gamestateDataset.iloc[0])
+
+    def createShapBackgroundDataset(pixelDataset, sampleSize=1000):
+        if pixelDataset.shape[0] > sampleSize:
+            backgroundData = pixelDataset.sample(sampleSize)
+        else:
+            backgroundData = pixelDataset
+        
+        backgroundData = backgroundData.values.reshape(-1, 7, 7, 3)#.transpose((0, 2, 1, 3))
+        backgroundData = torch.tensor(backgroundData, dtype=torch.float32)
+        return backgroundData
+    
+    test_2_background_data = createShapBackgroundDataset(gamestateDataset, sampleSize=10000)
+    print(test_2_background_data.shape)
+    
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
-    action = agent.policy_net(state).max(1)[1].view(1, 1)
-
-    def createUncoloredState(state):
-        uncolored_state = state.clone()
-        height, width = state.shape[1:3]
-        for i in range(height):
-            for j in range(width):
-                # Check if the cell has any non-zero values
-                if torch.any(state[0][i][j] > 0):
-                    # Set to white using tensor values
-                    uncolored_state[0][i][j][:] = 1.0
-        return uncolored_state
-
-    backgroundState = createUncoloredState(state)
-    shap_values = shap.GradientExplainer(agent.policy_net, backgroundState, batch_size=50).shap_values(state)
-    shap.image_plot(shap_values, state.numpy())
-
+    backgroundData = agent.createUncoloredState(state)
+    print(backgroundData.shape)
+    
+    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_1500k.pth")
+    df = agent.createShapDataset(env, backgroundData=backgroundData, batch_size=1000, num_episodes=10)
+    df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_test.csv", 
+                index=False)# No index as column
+                # float_format='%.8f')   # Round to 8 decimals
+    print("Complete")
+    
     """
-    #modelName = "WW_redReward0_grReward1_7x7_1500000steps"
     timeStart = time.time()
     for modelName, percent in zip(modelNames, [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
                                                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
@@ -170,3 +166,5 @@ if __name__ == "__main__":
                 # float_format='%.8f')   # Round to 8 decimals
         agent.printProgress(timeStart, percent=percent)
     print("Complete") # Exp: 5h runtime to shap all 21aaz
+    """
+    

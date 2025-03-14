@@ -229,11 +229,11 @@ class DqnAgent:
                     uncolored_state[0][i][j][:] = 1.0
         return uncolored_state
 
-    def createShapDataset(self, env, num_episodes=100, epsilon=0.05):
-        
-        state, _ = env.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-        backgroundState = self.createUncoloredState(state)
+    def createShapDataset(self, env, backgroundData=None, batch_size=1, num_episodes=100, epsilon=0.05):
+        if backgroundData is None:
+            state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            backgroundData = self.createUncoloredState(state)
         df = pd.DataFrame(columns=["target"]
                         + [f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
                         + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']])
@@ -243,7 +243,7 @@ class DqnAgent:
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             state_init = state.clone()
             action = self.policy_net(state).max(1)[1].view(1, 1)
-            shap_values = shap.GradientExplainer(self.policy_net, backgroundState, batch_size=1).shap_values(state)
+            shap_values = shap.GradientExplainer(self.policy_net, backgroundData, batch_size=batch_size).shap_values(state)
             action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
 
             terminated = False
