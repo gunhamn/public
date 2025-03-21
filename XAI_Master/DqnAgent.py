@@ -389,7 +389,6 @@ if __name__ == "__main__":
         tau=0.0005 # Was 0.005
         replayBuffer=100_000
 
-
         model_name = f"r{str(int(redChestReward * 10)).zfill(2)}_g{str(int(greenChestReward * 10)).zfill(2)}_{max_steps//1000}k"
 
         useWandb = False
