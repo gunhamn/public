@@ -76,7 +76,7 @@ if __name__ == "__main__":
         tau=tau,
         replayBuffer=replayBuffer)
     
-    maxSteps = 30
+    maxSteps = 30 #???? Should be 200??
     show_env = WallWorld(render_mode="human",
                     size=size, agentSpawn=agentSpawn,
                     stepLoss=stepLoss, maxSteps=maxSteps,
@@ -135,8 +135,8 @@ if __name__ == "__main__":
         backgroundData = torch.tensor(backgroundData, dtype=torch.float32)
         return backgroundData
     
-    background_data_10k_samples = createShapBackgroundDataset(gamestateDataset, sampleSize=10000)
-    print(background_data_10k_samples.shape)
+    background_data_40k_samples = createShapBackgroundDataset(gamestateDataset, sampleSize=40000)
+    print(background_data_40k_samples.shape)
     
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     print(backgroundData.shape)
     
     agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_1500k.pth")
-    df = agent.createShapDataset(env, backgroundData=background_data_10k_samples, batch_size=10000, num_episodes=10)
+    df = agent.createShapDataset(env, backgroundData=background_data_40k_samples, batch_size=40000, num_episodes=10)
     df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_test.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
@@ -156,7 +156,7 @@ if __name__ == "__main__":
                                                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        df = agent.createShapDataset(env, backgroundData=background_data_10k_samples, batch_size=10000, num_episodes=2000)
+        df = agent.createShapDataset(env, backgroundData=background_data_40k_samples, batch_size=40000, num_episodes=2000)
         df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals

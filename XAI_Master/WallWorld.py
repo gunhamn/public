@@ -189,7 +189,7 @@ class WallWorld(gym.Env):
         return self._get_obs(), self._get_info()
     
     def step(self, action):
-        # Map the action (element of {0,1,2,3}) to the direction we walk in
+        # Map the action {0,1,2,3} to direction right, down, left, up
         direction = self.action_to_direction[action]
 
         # Check if the agent is trying to walk into a wall
