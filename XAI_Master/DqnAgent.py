@@ -20,7 +20,7 @@ class neural_network(torch.nn.Module):
         # Action space: 4
         channels = 3
         size = len(observation_space_n)
-        # Size: 6
+        # Size: 7
         # Define the convolutional layers
         self.conv1 = nn.Conv2d(size, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
@@ -511,7 +511,8 @@ if __name__ == "__main__":
         randomgreenChests=randomgreenChests,
         randomkeys=randomkeys,
         agentSpawnCoordinates=agentSpawnCoordinates,
-        chestSpawnCoordinates=chestSpawnCoordinates)
+        chestSpawnCoordinates=chestSpawnCoordinates,
+        newDims=False)
     
     observation, _ = show_env.reset()
     agent = DqnAgent(show_env.action_space, observation,

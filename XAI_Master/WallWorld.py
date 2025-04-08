@@ -10,7 +10,7 @@ from gymnasium import spaces
 class WallWorld(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 5}
 
-    def __init__(self, render_mode=None, size=6, agentSpawn = None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, redChestCoordinates=None, greenChestCoordinates=None, keyCoordinates=None, redChestReward=0.1, greenChestReward=0.1, randomredChests=None, randomgreenChests=None, randomkeys=None, saveImages=False, killSwitchSteps=6, agentSpawnCoordinates=None, chestSpawnCoordinates=None):
+    def __init__(self, render_mode=None, size=6, agentSpawn = None, stepLoss=-0.01, maxSteps=100, wallCoordinates=None, randomWalls=None, redChestCoordinates=None, greenChestCoordinates=None, keyCoordinates=None, redChestReward=0.1, greenChestReward=0.1, randomredChests=None, randomgreenChests=None, randomkeys=None, saveImages=False, killSwitchSteps=6, agentSpawnCoordinates=None, chestSpawnCoordinates=None, newDims=False):
         self.size = size  # The size of the square grid
         self.agentSpawn = agentSpawn
         self.window_size = 512  # The size of the PyGame window
@@ -37,6 +37,7 @@ class WallWorld(gym.Env):
         self.killSwitchCount = 0
         self.agentSpawnCoordinates = agentSpawnCoordinates
         self.chestSpawnCoordinates = chestSpawnCoordinates
+        self.newDims = newDims
 
         self.wallColor = (0, 0, 0)
         self.blankColor = (255, 255, 255)
@@ -102,6 +103,8 @@ class WallWorld(gym.Env):
                 obs[coordinate[0], coordinate[1]] = self.wallColor
 
         obs = obs / 255 # normalise
+        if self.newDims:
+            obs = np.transpose(obs, (2, 0, 1))
         return obs
     
     def _get_info(self):

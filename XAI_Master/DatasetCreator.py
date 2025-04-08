@@ -6,7 +6,7 @@ import shap
 import time
 
 from WallWorld import WallWorld
-from DqnAgent import DqnAgent
+from DqnAgentNewDims import DqnAgentNewDims
 
 if __name__ == "__main__":
 
@@ -64,9 +64,10 @@ if __name__ == "__main__":
                     randomgreenChests=randomgreenChests,
                     randomkeys=randomkeys,
                     agentSpawnCoordinates=agentSpawnCoordinates,
-                    chestSpawnCoordinates=chestSpawnCoordinates)
+                    chestSpawnCoordinates=chestSpawnCoordinates,
+                    newDims=True)
     observation, _ = env.reset()
-    agent = DqnAgent(env.action_space, observation,
+    agent = DqnAgentNewDims(env.action_space, observation,
         batch_size=batch_size,
         lr=lr,
         gamma=gamma,
@@ -91,8 +92,9 @@ if __name__ == "__main__":
                     randomgreenChests=randomgreenChests,
                     randomkeys=randomkeys,
                     agentSpawnCoordinates=agentSpawnCoordinates,
-                    chestSpawnCoordinates=chestSpawnCoordinates)
-
+                    chestSpawnCoordinates=chestSpawnCoordinates,
+                    newDims=True)
+    """
     modelNames = ["r00_g10_1500k",
               "r01_g10_1500k",
               "r02_g10_1500k",
@@ -114,6 +116,29 @@ if __name__ == "__main__":
               "r10_g08_1500k",
               "r10_g09_1500k",
               "r10_g10_1500k"]
+    """
+    
+    modelNames = ["r00_g10_3000k",
+              "r01_g10_3000k",
+              "r02_g10_3000k",
+              "r03_g10_3000k",
+              "r04_g10_3000k",
+              "r05_g10_3000k",
+              "r06_g10_3000k",
+              "r07_g10_3000k",
+              "r08_g10_3000k",
+              "r09_g10_3000k",
+              "r10_g00_3000k",
+              "r10_g01_3000k",
+              "r10_g02_3000k",
+              "r10_g03_3000k",
+              "r10_g04_3000k",
+              "r10_g05_3000k",
+              "r10_g06_3000k",
+              "r10_g07_3000k",
+              "r10_g08_3000k",
+              "r10_g09_3000k",
+              "r10_g10_3000k"]
     
     gamestateDataset = pd.read_csv("C:/Projects/public/XAI_Master/datasets/42000_gamestates.csv")
 
@@ -131,7 +156,7 @@ if __name__ == "__main__":
         else:
             backgroundData = pixelDataset
         
-        backgroundData = backgroundData.values.reshape(-1, 7, 7, 3)#.transpose((0, 2, 1, 3))
+        backgroundData = backgroundData.values.reshape(-1, 7, 7, 3).transpose((0, 3, 2, 1))
         backgroundData = torch.tensor(backgroundData, dtype=torch.float32)
         return backgroundData
     
@@ -140,11 +165,12 @@ if __name__ == "__main__":
     
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
+    print(f"State shape: {state.shape}")
     backgroundData = agent.createUncoloredState(state)
     print(backgroundData.shape)
     
-    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_1500k.pth")
-    df = agent.createShapDataset(env, backgroundData=background_data_40k_samples, batch_size=40000, num_episodes=10)
+    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_3000k.pth")
+    df = agent.createShapDataset(env, backgroundData=backgroundData, batch_size=1, num_episodes=10)
     df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_test.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
@@ -156,16 +182,16 @@ if __name__ == "__main__":
                                                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        df = agent.createShapDataset(env, backgroundData=background_data_40k_samples, batch_size=40000, num_episodes=2000)
+        df = agent.createShapDataset(env, backgroundData=backgroundData, batch_size=1, num_episodes=2000)
         df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
-        """
+        
         df = agent.createActivationDataset(env, num_episodes=2000)
         df.to_csv(f"C:/Projects/public/XAI_Master/datasets/act_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
-        """
+        
         agent.printProgress(timeStart, percent=percent)
     print("Complete") # Exp: 5h runtime to shap all 21aaz
     
