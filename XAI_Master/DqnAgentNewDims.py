@@ -228,7 +228,7 @@ class DqnAgentNewDims:
                     uncolored_state[0][i][j][:] = 1.0
         return uncolored_state
 
-    def createShapDataset(self, env, backgroundData=None, batch_size=1, num_episodes=100, epsilon=0.05):
+    def createShapDataset(self, env, backgroundData=None, batch_size=64, num_episodes=100, epsilon=0.05):
         if backgroundData is None:
             state, _ = env.reset()
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -518,6 +518,7 @@ if __name__ == "__main__":
     observation, _ = env.reset()
     print(f"env.action_space: {env.action_space}")
     print(f"observation: {observation.shape}")
+    print(f"observation: {observation}")
     agent = DqnAgentNewDims(env.action_space, observation,
         batch_size=batch_size,
         lr=lr,
@@ -527,9 +528,8 @@ if __name__ == "__main__":
         epsilon_decay=epsilon_decay,
         tau=tau,
         replayBuffer=replayBuffer)
-    #agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_1500k.pth")
 
-    useWandb = True
+    useWandb = False
 
     model_name = "newDimsModel_2000k"
 
@@ -550,8 +550,9 @@ if __name__ == "__main__":
             "tau": tau})
 
 
-    agent.train(env=env, max_steps=2_000_000)
-    agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/{model_name}.pth")
+    #agent.train(env=env, max_steps=2_000_000)
+    
+    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_3000k.pth")
 
     maxSteps = 30
     show_env = WallWorld(render_mode="human",

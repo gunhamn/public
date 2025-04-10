@@ -140,7 +140,7 @@ if __name__ == "__main__":
               "r10_g09_3000k",
               "r10_g10_3000k"]
     
-    gamestateDataset = pd.read_csv("C:/Projects/public/XAI_Master/datasets/42000_gamestates.csv")
+    gamestateDataset = pd.read_csv("C:/Projects/public/XAI_Master/datasets/42000_gamestates_oldDims.csv")
 
     def plot_image(row):
         image_values = row.values.reshape(7, 7, 3).transpose((1, 0, 2))
@@ -156,27 +156,30 @@ if __name__ == "__main__":
         else:
             backgroundData = pixelDataset
         
-        backgroundData = backgroundData.values.reshape(-1, 7, 7, 3).transpose((0, 3, 2, 1))
+        backgroundData = backgroundData.values.reshape(-1, 7, 7, 3).transpose((0, 3, 1, 2)) #given the old dims
         backgroundData = torch.tensor(backgroundData, dtype=torch.float32)
         return backgroundData
     
     background_data_40k_samples = createShapBackgroundDataset(gamestateDataset, sampleSize=40000)
-    print(background_data_40k_samples.shape)
+    print(f"background_data_40k_samples.shape: {background_data_40k_samples.shape}")
+    print(f"background_data_40k_samples[0].shape: {background_data_40k_samples[0].shape}")
+    print(f"background_data_40k_samples[0]: {background_data_40k_samples[0]}")
     
     state, _ = env.reset()
     state = torch.tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
     print(f"State shape: {state.shape}")
-    backgroundData = agent.createUncoloredState(state)
-    print(backgroundData.shape)
+    print(f"State: {state}")
     
-    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r10_g10_3000k.pth")
-    df = agent.createShapDataset(env, backgroundData=backgroundData, batch_size=1, num_episodes=10)
+    #backgroundData = agent.createUncoloredState(state)
+    
+    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r07_g10_3000k.pth")
+    df = agent.createShapDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=10)
     df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_test.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
     print("Complete")
     
-    
+    """
     timeStart = time.time()
     for modelName, percent in zip(modelNames, [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
                                                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
@@ -194,4 +197,5 @@ if __name__ == "__main__":
         
         agent.printProgress(timeStart, percent=percent)
     print("Complete") # Exp: 5h runtime to shap all 21aaz
+    """
     
