@@ -11,6 +11,8 @@ from datetime import datetime
 import random
 import wandb
 import shap
+from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from WallWorld import WallWorld
 
@@ -77,8 +79,8 @@ class DqnAgentNewDims:
         wandFrequency = 1000
         loss = torch.tensor([0], dtype=torch.float32, device=self.device) # for plotting in wandb
         lastEpisodeReward, cummulativeReward, cummulativeSteps = 0, 0, 0
-        maxReward = -2 # a number under minimum reward
-        minReward = 2 # a number over maximum reward
+        maxReward = -2 # init number under minimum reward
+        minReward = 2 # init number over maximum reward
         while self.steps_done < max_steps:
             episodeSteps, episodeReward = 0, 0
             state, _ = env.reset()
@@ -228,6 +230,47 @@ class DqnAgentNewDims:
                     uncolored_state[0][i][j][:] = 1.0
         return uncolored_state
 
+    def createGradCamDataset(self, env, num_episodes=100, epsilon=0.05):
+        df = pd.DataFrame(columns=["target"]
+                        + [f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'gc{i}{j}' for i in range(7) for j in range(7)])
+        
+        for e in range(num_episodes):
+            state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state_init = state.clone()
+            action = self.policy_net(state).max(1)[1].view(1, 1)
+ 
+            with GradCAM(model=self.policy_net, target_layers=[self.policy_net.conv3]) as cam:
+                grayscaleGradCAM = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
+                
+
+            terminated = False
+            truncated = False
+
+            next_state, reward, terminated, truncated, _ = env.step(action.item())
+            reward = torch.tensor([reward], device=self.device)
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = next_state
+
+            while not terminated and not truncated:
+                if np.random.rand() < epsilon:
+                    action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
+                else:
+                    with torch.no_grad():
+                        action = self.policy_net(state).max(1)[1].view(1, 1)
+                next_state, reward, terminated, truncated, _ = env.step(action.item())
+                reward = torch.tensor([reward], device=self.device)
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                state = next_state
+            if terminated:
+                target = reward.item()          # 1 reward ---> green chest
+            else:                               # -1 reward ---> red chest
+                target = 0                      # 0 truncated --> no chest
+
+            df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(grayscale_cam.flatten())
+        return df
+
     def createShapDataset(self, env, backgroundData=None, batch_size=64, num_episodes=100, epsilon=0.05):
         if backgroundData is None:
             state, _ = env.reset()
@@ -267,15 +310,22 @@ class DqnAgentNewDims:
                 target = reward.item()          # 1 reward ---> green chest
             else:                               # -1 reward ---> red chest
                 target = 0                      # 0 truncated --> no chest
-            #df.loc[e] = [target, agentX, agentY, redX, redY, greenX, greenY] + list(activationData)
 
             df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(action_shap_values.flatten())
         return df
-
-    def createGradCamDataset(self, env, num_episodes=100, epsilon=0.05):
-        df = pd.DataFrame(columns=["target"]
-                        + [f'{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
-                        + [f'a{i}' for i in range(1, 129)])
+    
+    def createFullDataset(self, env, backgroundData=None, batch_size=64, num_episodes=100, epsilon=0.05, steps=4):
+        if backgroundData is None:
+            state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+            backgroundData = self.createUncoloredState(state)
+        df = pd.DataFrame(columns=["target"] + ["stepsTaken"]
+                        + [f'pix{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'act{i}' for i in range(1, 129)]
+                        + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'ngc{i}{j}' for i in range(7) for j in range(7)]
+                        + [f'xgc{i}{j}' for i in range(7) for j in range(7)])
+        
         activations = {}
         def get_activation(name):
             def hook(model, input, output):
@@ -284,25 +334,37 @@ class DqnAgentNewDims:
         # Register hook on the second last layer (fc1)
         hook = self.policy_net.fc1.register_forward_hook(get_activation('fc1'))
 
+        episode_df = pd.DataFrame(columns=["target"] + ["stepsTaken"]
+                        + [f'pix{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'act{i}' for i in range(1, 129)]
+                        + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
+                        + [f'ngc{i}{j}' for i in range(7) for j in range(7)]
+                        + [f'xgc{i}{j}' for i in range(7) for j in range(7)])
         for e in range(num_episodes):
+            # remove all rows from episode_df
+            episode_df = episode_df.iloc[0:0]
+            step_count = 0
+
             state, _ = env.reset()
-            # agentX, agentY = env.agentCoordinates, old
-            # redX, redY = env.redChestCoordinates[0], old
-            # greenX, greenY = env.greenChestCoordinates[0], old
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-            state_init = state.clone()
+            action = self.policy_net(state).max(1)[1].view(1, 1)
+
             terminated = False
             truncated = False
-
-            # Take 1 step to get the activations
-            action = self.policy_net(state).max(1)[1].view(1, 1)
-            next_state, reward, terminated, truncated, _ = env.step(action.item())
-            reward = torch.tensor([reward], device=self.device)
-            next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
-            state = next_state
-            activationData = activations['fc1'].cpu().numpy()[0].flatten()
-            """
+            
             while not terminated and not truncated:
+                if step_count <= steps:
+                    activationData = activations['fc1'].cpu().numpy()[0].flatten()
+                    shap_values = shap.GradientExplainer(self.policy_net, backgroundData, batch_size=batch_size).shap_values(state)
+                    action_shap_values = np.array([s[:,:,:,action.item()] for s in shap_values])
+                    with GradCAM(model=self.policy_net, target_layers=[self.policy_net.conv3]) as cam:
+                        grayscaleGradCAM = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
+                    with XGradCAM(model=self.policy_net, target_layers=[self.policy_net.conv3]) as cam:
+                        grayscaleXGradCAM = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
+                        
+                    episode_df.loc[step_count] = [0] + [step_count] + list(state.flatten().detach().numpy()) + list(activationData) + list(action_shap_values.flatten()) + list(grayscaleGradCAM.flatten()) + list(grayscaleXGradCAM.flatten())
+                    step_count += 1
+            
                 if np.random.rand() < epsilon:
                     action = torch.tensor([[random.randrange(self.action_space.n)]], device=self.device, dtype=torch.long)
                 else:
@@ -312,12 +374,18 @@ class DqnAgentNewDims:
                 reward = torch.tensor([reward], device=self.device)
                 next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
                 state = next_state
+
             if terminated:
                 target = reward.item()          # 1 reward ---> green chest
             else:                               # -1 reward ---> red chest
                 target = 0                      # 0 truncated --> no chest
-            df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(activationData)
-            """
+            # set target in all rows in episode_df to target
+            episode_df["target"] = target
+            # append episode_df to df
+            if not episode_df.empty and not episode_df.isna().all(axis=None):
+                df = pd.concat([df, episode_df], ignore_index=True)
+            else:
+                print(f"Episode {e}, step {step_count} had a NaN :(")
         hook.remove()
         return df
 

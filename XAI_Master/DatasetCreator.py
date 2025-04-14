@@ -170,32 +170,25 @@ if __name__ == "__main__":
     print(f"State shape: {state.shape}")
     print(f"State: {state}")
     
-    #backgroundData = agent.createUncoloredState(state)
+    # backgroundData = agent.createUncoloredState(state)
     
-    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r07_g10_3000k.pth")
-    df = agent.createShapDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=10)
-    df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_test.csv", 
+    agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/r02_g10_3000k.pth")
+    df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=5)
+    df.to_csv(f"C:/Projects/public/XAI_Master/datasets/full_test.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
     print("Complete")
     
-    """
+    
     timeStart = time.time()
     for modelName, percent in zip(modelNames, [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
                                                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        df = agent.createShapDataset(env, backgroundData=backgroundData, batch_size=1, num_episodes=2000)
-        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/shap_{modelName}.csv", 
+        df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=20)
+        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/full_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
-        
-        df = agent.createActivationDataset(env, num_episodes=2000)
-        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/act_{modelName}.csv", 
-                index=False)# No index as column
-                # float_format='%.8f')   # Round to 8 decimals
-        
         agent.printProgress(timeStart, percent=percent)
-    print("Complete") # Exp: 5h runtime to shap all 21aaz
-    """
+    print("Complete")
     
