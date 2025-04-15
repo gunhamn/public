@@ -13,6 +13,7 @@ import wandb
 import shap
 from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+import warnings
 
 from WallWorld import WallWorld
 
@@ -383,6 +384,7 @@ class DqnAgentNewDims:
             episode_df["target"] = target
             # append episode_df to df
             if not episode_df.empty and not episode_df.isna().all(axis=None):
+                warnings.filterwarnings("ignore", category=FutureWarning, message=".*DataFrame concatenation with empty or all-NA entries.*")
                 df = pd.concat([df, episode_df], ignore_index=True)
             else:
                 print(f"Episode {e}, step {step_count} had a NaN :(")
@@ -496,14 +498,14 @@ if __name__ == "__main__":
                [1, 0.1],
                [1, 0.0]]
 
-    """
+    
     for rewardCombination in rewardCombinations:
         print(f"Reward combination: {rewardCombination}")
         print(f"Reward combination[0]: {rewardCombination[0]}")
         print(f"Reward combination[1]: {rewardCombination[1]}")
         
-        redChestReward=rewardCombination[0] # Change this later
-        greenChestReward=rewardCombination[1] # Change this later
+        redChestReward=rewardCombination[0] # Changes during evaluation
+        greenChestReward=rewardCombination[1] # Changes during evaluation
 
         model_name = f"r{str(int(redChestReward * 10)).zfill(2)}_g{str(int(greenChestReward * 10)).zfill(2)}_{max_steps//1000}k"
 
@@ -559,7 +561,7 @@ if __name__ == "__main__":
         
         agent.train(env=env, max_steps=max_steps)
         if saveModel:
-            agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/{model_name}.pth")
+            agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/y_{model_name}.pth")
     print("Complete")
 
     """
@@ -641,6 +643,6 @@ if __name__ == "__main__":
         newDims=True)
     
     agent.inference(env=show_env, max_steps=1_000_000, epsilon=epsilon_min, renderQvalues=False)
-    
+    """
 
 

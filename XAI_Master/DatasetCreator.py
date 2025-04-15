@@ -185,7 +185,7 @@ if __name__ == "__main__":
                                                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=20)
+        df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=800)
         df.to_csv(f"C:/Projects/public/XAI_Master/datasets/full_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
