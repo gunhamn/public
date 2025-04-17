@@ -325,7 +325,8 @@ class DqnAgentNewDims:
                         + [f'act{i}' for i in range(1, 129)]
                         + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
                         + [f'ngc{i}{j}' for i in range(7) for j in range(7)]
-                        + [f'xgc{i}{j}' for i in range(7) for j in range(7)])
+                        + [f'xgc{i}{j}' for i in range(7) for j in range(7)]
+                        + [f'gcpp{i}{j}' for i in range(7) for j in range(7)])
         
         activations = {}
         def get_activation(name):
@@ -340,7 +341,8 @@ class DqnAgentNewDims:
                         + [f'act{i}' for i in range(1, 129)]
                         + [f'shap{i}{j}{c}' for i in range(7) for j in range(7) for c in ['r','g','b']]
                         + [f'ngc{i}{j}' for i in range(7) for j in range(7)]
-                        + [f'xgc{i}{j}' for i in range(7) for j in range(7)])
+                        + [f'xgc{i}{j}' for i in range(7) for j in range(7)]
+                        + [f'gcpp{i}{j}' for i in range(7) for j in range(7)])
         for e in range(num_episodes):
             # remove all rows from episode_df
             episode_df = episode_df.iloc[0:0]
@@ -362,8 +364,11 @@ class DqnAgentNewDims:
                         grayscaleGradCAM = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
                     with XGradCAM(model=self.policy_net, target_layers=[self.policy_net.conv3]) as cam:
                         grayscaleXGradCAM = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
-                        
-                    episode_df.loc[step_count] = [0] + [step_count] + list(state.flatten().detach().numpy()) + list(activationData) + list(action_shap_values.flatten()) + list(grayscaleGradCAM.flatten()) + list(grayscaleXGradCAM.flatten())
+                    with GradCAMPlusPlus(model=self.policy_net, target_layers=[self.policy_net.conv3]) as cam:
+                        grayscaleGradCAMplusPlus = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
+                    #GradCAMPlusPlus
+
+                    episode_df.loc[step_count] = [0] + [step_count] + list(state.flatten().detach().numpy()) + list(activationData) + list(action_shap_values.flatten()) + list(grayscaleGradCAM.flatten()) + list(grayscaleXGradCAM.flatten() + list(grayscaleGradCAMplusPlus.flatten()))
                     step_count += 1
             
                 if np.random.rand() < epsilon:
@@ -497,7 +502,7 @@ if __name__ == "__main__":
                [1, 0.2],
                [1, 0.1],
                [1, 0.0]]
-
+    """
     
     for rewardCombination in rewardCombinations:
         print(f"Reward combination: {rewardCombination}")
@@ -643,6 +648,6 @@ if __name__ == "__main__":
         newDims=True)
     
     agent.inference(env=show_env, max_steps=1_000_000, epsilon=epsilon_min, renderQvalues=False)
-    """
+
 
 
