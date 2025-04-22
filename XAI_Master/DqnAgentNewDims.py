@@ -368,7 +368,7 @@ class DqnAgentNewDims:
                         grayscaleGradCAMplusPlus = cam(input_tensor=state, targets=[ClassifierOutputTarget(action.item())])[0, :]
                     #GradCAMPlusPlus
 
-                    episode_df.loc[step_count] = [0] + [step_count] + list(state.flatten().detach().numpy()) + list(activationData) + list(action_shap_values.flatten()) + list(grayscaleGradCAM.flatten()) + list(grayscaleXGradCAM.flatten() + list(grayscaleGradCAMplusPlus.flatten()))
+                    episode_df.loc[step_count] = [0] + [step_count] + list(state.flatten().detach().numpy()) + list(activationData) + list(action_shap_values.flatten()) + list(grayscaleGradCAM.flatten()) + list(grayscaleXGradCAM.flatten()) + list(grayscaleGradCAMplusPlus.flatten())
                     step_count += 1
             
                 if np.random.rand() < epsilon:

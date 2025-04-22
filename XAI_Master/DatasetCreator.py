@@ -116,7 +116,7 @@ if __name__ == "__main__":
               "r10_g08_1500k",
               "r10_g09_1500k",
               "r10_g10_1500k"]
-    """
+    
     
     modelNames = ["r00_g10_3000k",
               "r01_g10_3000k",
@@ -139,6 +139,28 @@ if __name__ == "__main__":
               "r10_g08_3000k",
               "r10_g09_3000k",
               "r10_g10_3000k"]
+    """
+    modelNames = ["y_r00_g10_3000k",
+                "y_r01_g10_3000k",
+                "y_r02_g10_3000k",
+                "y_r03_g10_3000k",
+                "y_r04_g10_3000k",
+                "y_r05_g10_3000k",
+                "y_r06_g10_3000k",
+                "y_r07_g10_3000k",
+                "y_r08_g10_3000k",
+                "y_r09_g10_3000k",
+                "y_r10_g00_3000k",
+                "y_r10_g01_3000k",
+                "y_r10_g02_3000k",
+                "y_r10_g03_3000k",
+                "y_r10_g04_3000k",
+                "y_r10_g05_3000k",
+                "y_r10_g06_3000k",
+                "y_r10_g07_3000k",
+                "y_r10_g08_3000k",
+                "y_r10_g09_3000k",
+                "y_r10_g10_3000k"]
     
     gamestateDataset = pd.read_csv("C:/Projects/public/XAI_Master/datasets/42000_gamestates_oldDims.csv")
 
@@ -160,7 +182,7 @@ if __name__ == "__main__":
         backgroundData = torch.tensor(backgroundData, dtype=torch.float32)
         return backgroundData
     
-    background_data_40k_samples = createShapBackgroundDataset(gamestateDataset, sampleSize=40000)
+    background_data_40k_samples = createShapBackgroundDataset(gamestateDataset, sampleSize=42000)
     print(f"background_data_40k_samples.shape: {background_data_40k_samples.shape}")
     print(f"background_data_40k_samples[0].shape: {background_data_40k_samples[0].shape}")
     print(f"background_data_40k_samples[0]: {background_data_40k_samples[0]}")
@@ -181,12 +203,14 @@ if __name__ == "__main__":
     
     
     timeStart = time.time()
-    for modelName, percent in zip(modelNames, [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
-                                               0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]):
+    for modelName, percent in zip(modelNames, [0.0476, 0.0952, 0.1429, 0.1905, 0.2381, 0.2857,
+                                               0.3333, 0.3810, 0.4286, 0.4762, 0.5238, 0.5714,
+                                               0.6190, 0.6667, 0.7143, 0.7619, 0.8095, 0.8571,
+                                               0.9048, 0.9524, 1.0000]):
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
-        df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=800)
-        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/full_{modelName}.csv", 
+        df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=2000)
+        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/y_full_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
         agent.printProgress(timeStart, percent=percent)
