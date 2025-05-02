@@ -269,7 +269,7 @@ class DqnAgentNewDims:
             else:                               # -1 reward ---> red chest
                 target = 0                      # 0 truncated --> no chest
 
-            df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(grayscale_cam.flatten())
+            df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(grayscaleGradCAM.flatten())
         return df
 
     def createShapDataset(self, env, backgroundData=None, batch_size=64, num_episodes=100, epsilon=0.05):

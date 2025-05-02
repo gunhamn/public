@@ -201,7 +201,7 @@ if __name__ == "__main__":
                 # float_format='%.8f')   # Round to 8 decimals
     print("Complete")
     
-    
+    """
     timeStart = time.time()
     for modelName, percent in zip(modelNames, [0.0476, 0.0952, 0.1429, 0.1905, 0.2381, 0.2857,
                                                0.3333, 0.3810, 0.4286, 0.4762, 0.5238, 0.5714,
@@ -210,9 +210,10 @@ if __name__ == "__main__":
         print(f"Creating dataset for {modelName}")
         agent.load_model_weights(f"C:/Projects/public/XAI_Master/models/{modelName}.pth")
         df = agent.createFullDataset(env, backgroundData=background_data_40k_samples, batch_size=64, num_episodes=2000)
-        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/y_full_{modelName}.csv", 
+        df.to_csv(f"C:/Projects/public/XAI_Master/datasets/a_full_{modelName}.csv", 
                 index=False)# No index as column
                 # float_format='%.8f')   # Round to 8 decimals
         agent.printProgress(timeStart, percent=percent)
     print("Complete")
+    """
     
