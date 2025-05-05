@@ -21,8 +21,8 @@ class neural_network(torch.nn.Module):
     def __init__(self, observation, action_space_n):
         super(neural_network, self).__init__()
         channels = observation.shape[0] # 3 channels (RGB)
-        height = observation.shape[1]
-        width = observation.shape[2]
+        height = observation.shape[1] # 7
+        width = observation.shape[2] # 7
 
         # Expoecting shape is [batch_size, 3, 7, 7]
         self.conv1 = nn.Conv2d(channels, 32, kernel_size=3, stride=1, padding=1)
@@ -45,7 +45,7 @@ class neural_network(torch.nn.Module):
 
 
 class DqnAgentNewDims:
-    def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.001, replayBuffer=10_000, trainFrequency=15, wandb=None):
+    def __init__(self, action_space, observation, batch_size=128, lr=0.0001, gamma=0.99, epsilon_start=0.9, epsilon_min=0.05, epsilon_decay=1000, tau=0.001, replayBuffer=10_000, trainFrequency=15, wandb=None, randomSeed=48):
         self.action_space = action_space
         self.observation = observation
         self.batch_size = batch_size
@@ -70,9 +70,9 @@ class DqnAgentNewDims:
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
 
-        random.seed(48)
-        np.random.seed(48)
-        torch.manual_seed(48)
+        random.seed(randomSeed)
+        np.random.seed(randomSeed)
+        torch.manual_seed(randomSeed)
 
     def train(self, env, max_steps=1_000_000, train=True, fixedEpsilon=None, renderQvalues=False):
         timeStart = time.time()
