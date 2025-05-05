@@ -502,9 +502,12 @@ if __name__ == "__main__":
                [1, 0.2],
                [1, 0.1],
                [1, 0.0]]
-    """
     
+    max_steps=0
     for rewardCombination in rewardCombinations:
+
+        max_steps+=150_000 # 150_000 steps for each reward combination
+        print(f"max_steps: {max_steps}")
         print(f"Reward combination: {rewardCombination}")
         print(f"Reward combination[0]: {rewardCombination[0]}")
         print(f"Reward combination[1]: {rewardCombination[1]}")
@@ -514,7 +517,7 @@ if __name__ == "__main__":
 
         model_name = f"r{str(int(redChestReward * 10)).zfill(2)}_g{str(int(greenChestReward * 10)).zfill(2)}_{max_steps//1000}k"
 
-        useWandb = True
+        useWandb = False
         saveModel = True
 
         if useWandb:
@@ -566,7 +569,7 @@ if __name__ == "__main__":
         
         agent.train(env=env, max_steps=max_steps)
         if saveModel:
-            agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/y_{model_name}.pth")
+            agent.save_model_weights(f"C:/Projects/public/XAI_Master/models/s_{model_name}_{max_steps}steps.pth")
     print("Complete")
 
     """
@@ -648,6 +651,6 @@ if __name__ == "__main__":
         newDims=True)
     
     agent.inference(env=show_env, max_steps=1_000_000, epsilon=epsilon_min, renderQvalues=False)
-
+    """
 
 
