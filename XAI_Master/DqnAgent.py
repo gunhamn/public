@@ -211,7 +211,7 @@ class DqnAgent:
                 next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
                 state = next_state
             if terminated:
-                target = reward.item()          # 1 reward ---> green chest
+                target = reward.item()          # 1 reward --> green chest
             else:                               # -1 reward ---> red chest
                 target = 0                      # 0 truncated --> no chest
             df.loc[e] = [target] + list(state_init.flatten().detach().numpy()) + list(activationData)
